@@ -73,6 +73,9 @@ then move — user's Q4 choice, proportional editing, numeric input), then phase
 - v01.10 = G2: frame-point / falloff drag = StrokeSession MODE_DEFORM (preview while dragging, refit on release, one undo for many paths);
   keys only + falloff off = old DragSession. Anchor = press-pixel ray ∩ drag plane (else a still click wrote keys). Lines drawn in screen 2D
   (x-ray only works for points) — plugin 1.7. User GUI-confirmed (v01.09): points visible, radius text, softSelect untouched.
-- Next: G3 gizmo (core/gizmo.py from bench_g0 prototypes), then G4 Speed tab Edit Path / live graph / [a,b] colors / Smooth Range mask.
+- v01.11 = G3 gizmo (core/gizmo.py shared by plugin draw + context pick; centre square follows "Drag in" because pressing a selected
+  point always hits the centre; centre picked before axes; W/E eaten by the key filter). refit CurveSnap.evaluate vectorized
+  (6,000-key curve release 986 -> 240 ms). User GUI-confirmed v01.10 ("잘 된다").
+- Next: G4 Speed tab Edit Path button / live graph from manager.preview / [a,b] weight colors / Smooth Range with falloff mask.
 
 Related: [[maya-time-context-traps]] · [[wip-a00380-quad-patch]] · [[mayapy-headless-verify]] · [[feedback-sliders-use-shared-style]]

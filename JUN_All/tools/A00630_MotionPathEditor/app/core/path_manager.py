@@ -14,12 +14,15 @@ PathManager 하나가 툴의 상태를 다 가진다:
 씬을 바꾸는 것은 키 값뿐이고(편집 세션), 그리기 노드는 undo 큐 밖에서 만든다(draw_nodes).
 """
 
+import numpy as np
+
 import maya.cmds as cmds
 
 from . import anim_channels as ch
 from . import draw_bridge
 from . import draw_nodes
 from . import falloff
+from . import gizmo
 from . import path_cache as pc
 
 RANGE_PLAYBACK = "playback"
@@ -53,6 +56,9 @@ DEFAULT_SETTINGS = {
     "falloff_on": False,
     "falloff_radius": 8.0,         # 프레임 (경로를 따라 잰 거리)
     "falloff_curve": "",           # json (falloff.curve_to_text), "" = Smooth 프리셋
+    # v01.11 매니퓰레이터 (계획서 §3-4)
+    "manip_mode": "move",          # move / rotate
+    "manip_axes": "world",         # world / path (고른 점 자리의 접선 · 위 · 옆)
 }
 
 
@@ -71,6 +77,10 @@ class PathManager(object):
         self.listeners = []
         self._lut_key = None
         self._lut = None
+        self.gizmo_on = False           # v01.11 편집 컨텍스트가 켜져 있으면 고른 점에 매니퓰레이터를 그린다
+        self.gizmo_active = None        # 끄는 중인 부분 (노랑)
+        self.gizmo_pivot = None         # 끄는 중 피벗 (이동하면 따라간다) - None 이면 고른 점의 무게중심
+        self.gizmo_axes = None          # 끄는 중 축 고정 (Path 축이 끄는 동안 돌지 않게)
 
     # ---------------------------------------------------------------- 범위
     def frame_range(self):
@@ -130,6 +140,7 @@ class PathManager(object):
         for key in list(self.caches):
             self._remove(key)
         self.order = []
+        draw_bridge.GIZMO.clear()
         draw_nodes.delete_all()
 
     # ---------------------------------------------------------------- 애니메이션 레이어 (v01.03)
@@ -208,6 +219,7 @@ class PathManager(object):
                 show_keys=s["show_keys"], show_numbers=s["show_numbers"], line_width=s["line_width"],
                 dot_size=s["dot_size"], key_size=s["key_size"], points=preview,
                 ghost=cache.points if preview is not None else None, weights=self.weights_for(cache)))
+        self._update_gizmo()
         if self.view_refresh is not None:
             self.view_refresh()
         for fn in list(self.listeners):
@@ -285,6 +297,49 @@ class PathManager(object):
                 if any(round(t, 3) not in keyed for t in times):
                     return True
         return False
+
+    # ---------------------------------------------------------------- 매니퓰레이터 (v01.11)
+    def gizmo_frame(self):
+        """(피벗 (3,), 축 (3,3)) - 고른 점들의 무게중심 · World 또는 Path 축. 고른 것이 없으면 None.
+        미리보기 중이면 미리보기 점으로 (끄는 동안 기즈모가 점을 따라간다)."""
+        pts, first = [], None
+        for c in self.cache_list():
+            times = self.selection.get(c.key)
+            if not times or c.points is None or c.locked:
+                continue
+            P = self.preview.get(c.key)
+            P = c.points if P is None else P
+            rows = [r for r in (c.row_of(t) for t in sorted(times)) if r is not None]
+            if not rows:
+                continue
+            pts.append(P[rows])
+            if first is None:
+                first = (P, rows[len(rows) // 2])
+        if not pts:
+            return None
+        pivot = np.vstack(pts).mean(axis=0)
+        if self.settings.get("manip_axes") == gizmo.AXES_PATH and first is not None:
+            axes = gizmo.path_frame(first[0], first[1])
+        else:
+            axes = np.eye(3)
+        return pivot, axes
+
+    def _update_gizmo(self):
+        draw_bridge.GIZMO.clear()
+        if not self.gizmo_on:
+            return
+        frame = self.gizmo_frame()
+        caches = self.cache_list()
+        if frame is None or not caches:
+            return
+        pivot, axes = frame
+        if self.gizmo_pivot is not None:
+            pivot = self.gizmo_pivot
+        if self.gizmo_axes is not None:
+            axes = self.gizmo_axes
+        draw_bridge.GIZMO.update({"owner": caches[0].key, "pivot": np.asarray(pivot, dtype="float64"),
+                                  "axes": np.asarray(axes, dtype="float64"),
+                                  "mode": self.settings.get("manip_mode", gizmo.MODE_MOVE), "active": self.gizmo_active})
 
     # ---------------------------------------------------------------- 폴오프 (v01.09)
     def falloff_radius(self):

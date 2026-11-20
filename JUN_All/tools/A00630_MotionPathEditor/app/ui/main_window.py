@@ -273,6 +273,7 @@ class MainWindow(QWidget):
             "Click a key or a frame dot: select it (Shift: add / remove, Ctrl: remove). Drag on empty space: box select.\n"
             "Drag a selected key: move it (and the other selected keys) - the animation follows.\n"
             "Tap b: falloff on / off. Hold b and drag left / right: falloff radius (Ctrl+Shift + drag works too).\n"
+            "The manipulator on the selection moves / rotates it (w / e switch).\n"
             "Right mouse while dragging: cancel. Alt + drag: Maya camera. Q: back to the select tool.")
         self.btn_edit.toggled.connect(self.set_edit_mode)
         # v01.01 - 켜져 있으면 연한 빨강 (공용 pin_style : 체크형 토글 = 켜짐 연한 빨강)
@@ -301,10 +302,41 @@ class MainWindow(QWidget):
         self.plane_buttons.buttonClicked.connect(
             lambda btn: self._set("plane", btn.property("plane"), redraw=False))
         lay.addLayout(plane)
+        lay.addLayout(self._build_manip_row())
         lay.addLayout(self._build_falloff_row())
         self.lbl_selection = QLabel("")
         lay.addWidget(self.lbl_selection)
         return box
+
+    def _build_manip_row(self):
+        """v01.11 매니퓰레이터 - Move / Rotate (뷰포트에서 w / e), 축 World / Path."""
+        s = self.manager.settings
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Manipulator"))
+        self.manip_buttons = QButtonGroup(self)
+        for label, value, tip in (("Move", "move", "Arrows, planes and the centre square move the selected points (w)."),
+                                  ("Rotate", "rotate", "Rings turn the selected points around their centre (e).")):
+            rb = QRadioButton(label)
+            rb.setToolTip(tip)
+            rb.setProperty("manip", value)
+            rb.setChecked(s["manip_mode"] == value)
+            self.manip_buttons.addButton(rb)
+            row.addWidget(rb)
+        self.manip_buttons.buttonClicked.connect(lambda btn: self._set("manip_mode", btn.property("manip")))
+        row.addSpacing(12)
+        row.addWidget(QLabel("Axes"))
+        self.axes_buttons = QButtonGroup(self)
+        for label, value, tip in (("World", "world", "World X / Y / Z."),
+                                  ("Path", "path", "Along the path (X), up (Y) and side (Z) at the selected points.")):
+            rb = QRadioButton(label)
+            rb.setToolTip(tip)
+            rb.setProperty("axes", value)
+            rb.setChecked(s["manip_axes"] == value)
+            self.axes_buttons.addButton(rb)
+            row.addWidget(rb)
+        self.axes_buttons.buttonClicked.connect(lambda btn: self._set("manip_axes", btn.property("axes")))
+        row.addStretch(1)
+        return row
 
     def _build_falloff_row(self):
         """v01.09 폴오프 - 켜기 · 반경(프레임) · 커브. 뷰포트에서 b 톡 = 켜기 / 끄기, b + 끌기 = 반경."""
@@ -362,6 +394,8 @@ class MainWindow(QWidget):
         self.sp_falloff.blockSignals(True)
         self.sp_falloff.setValue(float(s["falloff_radius"]))
         self.sp_falloff.blockSignals(False)
+        for btn in self.manip_buttons.buttons():                # v01.11 w / e
+            btn.setChecked(btn.property("manip") == s["manip_mode"])
         self._show_selection()
 
     # ==================================================================

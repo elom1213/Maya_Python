@@ -7,7 +7,7 @@ updated: 2026-11-20
 
 # A00630_MotionPathEditor — 매니퓰레이터 · 폴오프 편집 하위 계획서
 
-> 작성 2026-11-20 · 상태: **G0 끝 · G1 (v01.09) · G2 (v01.10, mayapy 419/419) · G3 다음** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
+> 작성 2026-11-20 · 상태: **G0 끝 · G1 (v01.09) · G2 (v01.10) · G3 (v01.11, mayapy 465/465) · G4 다음** · 상위 계획서 [`A00630_MotionPathEditor_plan.md`](A00630_MotionPathEditor_plan.md) §5 **1.5단계 "프레임 단위 편집 · 비례 편집"** 의 하위 계획
 > · 형제 계획서 [`A00630_MotionPathEditor_speed_graph_plan.md`](A00630_MotionPathEditor_speed_graph_plan.md) (Speed 탭 · 획 세션 · refit — 이 계획이 그대로 재사용한다)
 >
 > 요청 (2026-11-20):
@@ -330,3 +330,15 @@ mayapy 에는 핫키 세트가 없어 `hotkey -q b` = None — 실제 값은 GUI
 - 판단: 그리기 · 끄는 중은 가볍다. **놓을 때 0.8 s 가 눈에 띈다** — `end_stroke` 가 바뀐 곳이 59 프레임뿐인데도 세 축 5,990 키 커브 전체를 refit 한다.
   개선 후보(G3 와 함께): refit 을 바뀐 구간 [a, b] ± 이웃 키로 제한, 매 프레임 키 커브는 refit 없이 값만 쓰기.
 - 처음 굽기 14 s 는 리그 평가 비용(프레임마다 parentMatrix) — 마야 Motion Trail 도 같은 평가가 필요하다(상위 계획서 0단계 표).
+
+### G3 (2026-11-20, v01.11)
+
+- 사용자 GUI 확인(v01.10): "잘 된다" — 2D 선 · 폴오프 끌기 · undo.
+- 구현: `core/gizmo.py`(모양 · 고르기 · 끌기, 플러그인과 컨텍스트가 같은 `geometry()`) · 관리자 `gizmo_frame`(무게중심 · World/Path 축) → `draw_bridge.GIZMO` ·
+  플러그인 `_draw_gizmo`(화면 2D, 화살표 머리 2D, 잡은 부분 노랑, 1.8) · 컨텍스트 `_press_gizmo / _drag_gizmo / _end_gizmo` · 키 필터 W/E · 창 Manipulator 줄.
+- 정한 것: 가운데 사각형 = **Drag in** 을 따른다(고른 점 위를 누르면 늘 가운데가 잡혀서, 화면 평면으로 두면 기존 "Drag in Y" 시험이 깨졌다 = 사용자 설정이 무시됨).
+  가운데가 축보다 먼저(원근에서 카메라 쪽 축이 짧아져 가운데와 겹친다). 키만 + 폴오프 끔 + 이동 = `DragSession`(라이브), 나머지 = deform. 회전은 늘 deform.
+  고리가 시선과 거의 나란하면 화면 접선 이동량 / SIZE_PX 로 각도(평면 교점이 튄다).
+- **[Perf] refit `CurveSnap.evaluate` 벡터화** — 6,000 키 커브 놓기 986 → 240 ms(남은 것 = 마야에서 키 읽기 `read_curve` · 경로 다시 계산, 꼭 필요). 골든 시험 40/40 그대로.
+- 시험 `test_gizmo.py` **46**, 전체 **465/465**. 가짜 정사영 뷰의 깊이 축 부호를 실제와 맞춤(기즈모가 view_proj 에서 시선을 뽑는다).
+- 남은 GUI 확인: 기즈모 모양 · 크기 · 고르기 감각, w/e 가 실제로 마야 툴 전환을 막는지(B 와 같은 길이라 될 것으로 본다).

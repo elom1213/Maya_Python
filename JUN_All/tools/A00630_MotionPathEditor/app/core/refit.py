@@ -118,16 +118,32 @@ class CurveSnap(object):
         out[ts >= self.t[-1]] = self.y[-1]
         if self.count == 1:
             return out
-        seg = np.searchsorted(self.t, ts, side="right") - 1
         inside = (ts > self.t[0]) & (ts < self.t[-1])
-        for i in np.unique(seg[inside]):
-            sel = inside & (seg == i)
-            u = self.segment_u(i, ts[sel])
-            a, b = self.handles(i)
-            y0, y1 = self.y[i], self.y[i + 1]
-            p1 = y0 + self.mout[i] * a
-            p2 = y1 - self.min[i + 1] * b
-            out[sel] = (1 - u) ** 3 * y0 + 3 * (1 - u) ** 2 * u * p1 + 3 * (1 - u) * u ** 2 * p2 + u ** 3 * y1
+        if not np.any(inside):
+            return out
+        # v01.11 - 모든 표본을 한 번에 (구간마다 루프를 돌면 매 프레임 키 6,000 개 커브 평가 한 번이 0.1 초였다)
+        tt = ts[inside]
+        i = np.clip(np.searchsorted(self.t, tt, side="right") - 1, 0, self.count - 2)
+        t0, t1 = self.t[i], self.t[i + 1]
+        if self.weighted:
+            a, b = self.lout[i], self.lin[i + 1]
+            x1, x2 = t0 + a, t1 - b
+            lo = np.zeros_like(tt)
+            hi = np.ones_like(tt)
+            for _ in range(60):                 # 이분법 (segment_u 와 같은 식, 표본마다 핸들이 다르다)
+                u = 0.5 * (lo + hi)
+                x = (1 - u) ** 3 * t0 + 3 * (1 - u) ** 2 * u * x1 + 3 * (1 - u) * u ** 2 * x2 + u ** 3 * t1
+                below = x < tt
+                lo = np.where(below, u, lo)
+                hi = np.where(below, hi, u)
+            u = 0.5 * (lo + hi)
+        else:
+            a = b = (t1 - t0) / 3.0
+            u = np.clip((tt - t0) / (t1 - t0), 0.0, 1.0)
+        y0, y1 = self.y[i], self.y[i + 1]
+        p1 = y0 + self.mout[i] * a
+        p2 = y1 - self.min[i + 1] * b
+        out[inside] = (1 - u) ** 3 * y0 + 3 * (1 - u) ** 2 * u * p1 + 3 * (1 - u) * u ** 2 * p2 + u ** 3 * y1
         return out
 
     def slope_at(self, t, h=1e-4):

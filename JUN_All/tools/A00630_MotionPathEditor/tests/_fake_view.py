@@ -29,7 +29,8 @@ class FakeViewState(object):
     def __init__(self):
         self.view = FakeM3dView()
         sx, sy = 1.0 / HALF, 1.0 / (HALF * H / W)
-        self.view_proj = np.array([[sx, 0, 0, 0], [0, sy, 0, 0], [0, 0, 0.01, 0], [-CX * sx, -CY * sy, 0, 1.0]])
+        # z 는 -0.01 : 카메라가 -Z 를 본다(z 가 클수록 가깝다 = NDC -1 쪽) - v01.11 기즈모가 행렬에서 시선 방향을 뽑는다
+        self.view_proj = np.array([[sx, 0, 0, 0], [0, sy, 0, 0], [0, 0, -0.01, 0], [-CX * sx, -CY * sy, 0, 1.0]])
         self.width, self.height = W, H
         self.view_dir = np.array([0.0, 0.0, -1.0])
 

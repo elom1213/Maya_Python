@@ -229,7 +229,7 @@ check("auto-repeat press is eaten but ignored", flt.eventFilter(None, key_event(
       ctx.b_held and not ctx.b_used)
 check("filter eats KeyRelease B -> tap = falloff on", flt.eventFilter(None, key_event("release")) is True and
       not ctx.b_held and mgr.settings["falloff_on"])
-check("other keys pass", flt.eventFilter(None, key_event("press", key=Qt.Key_W)) is False)
+check("other keys pass (q - back to Maya's select tool)", flt.eventFilter(None, key_event("press", key=Qt.Key_Q)) is False)
 check("Ctrl+B passes (left to Maya)", flt.eventFilter(None, key_event("press", mods=Qt.ControlModifier)) is False)
 ctx.is_active = lambda: False
 check("B passes when another Maya tool is current", flt.eventFilter(None, key_event("press")) is False and

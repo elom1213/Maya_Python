@@ -57,7 +57,7 @@ check("screen strips: pixel = picking.project", np.allclose(strips[0], picking.p
 check("screen strips: a lone point makes no line", plugin_source.screen_strips(pts[:1], VP, 200, 100) == [])
 loaded = mel.eval('junMotionPathVersion')
 loaded = loaded[0] if isinstance(loaded, (list, tuple)) else loaded
-check("plugin 1.7 loaded", plugin_source.PLUGIN_VERSION == "1.7" and loaded == "1.7", loaded)
+check("the loaded plugin is the current one", loaded == plugin_source.PLUGIN_VERSION, loaded)
 
 # ====================================================================== 1. 세션 deform 모드
 names = scenes.simple(120)

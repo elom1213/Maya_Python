@@ -33,6 +33,9 @@ DATA[path_key] 키 (값은 OpenMaya 2.0 객체 - 그리기 때 변환하지 않�
 
 DATA = {}
 HUD = {}
+#: v01.11 매니퓰레이터 - {"owner": 경로 키, "pivot": (3,), "axes": (3,3), "mode": "move"/"rotate", "active": 부분 이름 또는 None}
+#: 비었으면 안 그린다. 크기는 화면 픽셀 고정이라 플러그인이 그릴 때 뷰로 정한다(core/gizmo.geometry).
+GIZMO = {}
 PENDING = None
 DIRTY = None
 
@@ -48,6 +51,7 @@ def drop(path_key):
 def clear():
     DATA.clear()
     HUD.clear()
+    GIZMO.clear()
 
 
 def stage(change, nodes=()):
