@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 # 작업 일지 (WORKLOG)
@@ -158,6 +158,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 - **v01.47** — 요청: Move · Smooth 탭 슬라이더도 같은 방식으로. → 두 탭에 `JUN_mod_sliderStyle_qt_v01(self)` 한 줄씩(모두 0 부터 한쪽 방향이라 fill 켬). `test_flood_ui` 39/39(탭마다 칠해짐 + 홈 픽셀) · 회귀 통과.
 
 ---
+
+> [!summary] **`A00210_FileManager` 데이터 저장소 정리 — 옛 클론 3개 · 옛 원격 브랜치 4개 삭제 (11-18 알림)** `#A00210_FileManager`
+- 11-07 데이터 폴더 구조 반영(v01.45, `main` + `profiles/<data_folder>/`) 뒤 1~2주 지나 남겨 둔 정리. 알림 날짜(11-18)가 지나 사용자에게 알리고, 사용자 답: 세 건 모두 진행.
+- 사전 점검: 옛 브랜치 4개 = `archive/*` 태그와 같은 커밋 · 11-04 뒤 새 커밋 없음, 클론 3개는 미커밋 · 미푸시 · stash 없음.
+- 실행: `JUN_FileManager_data_all\` 의 옛 클론 3개 + 폴더 삭제, `git push origin --delete master Dnable SA src_rig` → 원격엔 `main` 만, `archive/*` 태그 5개는 남김.
+- **남은 것**: 비공개 저장소 Archive — 이 PC 의 `gh` 가 로그인되어 있지 않다(`gh auth login` 필요). 백업 미러의 MUE · master · private 는 원격과 같은 커밋인 것을 확인해 둠.
 
 ## 2026-11-17
 
