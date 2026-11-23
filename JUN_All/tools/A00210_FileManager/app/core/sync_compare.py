@@ -114,10 +114,11 @@ def _decide(entries, pcs):
     return status, unsure
 
 
-def compare(manifests, this_pc, excluded=(), ignore=()):
+def compare(manifests, this_pc, excluded=(), ignore=(), depth=0):
     """manifests {pc: manifest} -> [FileStatus] (경로순).
 
-    excluded / ignore 는 비교 때도 거른다 - 제외 목록을 고친 직후 다른 PC 가 아직 다시 스캔하지 않았어도 결과가 맞다."""
+    excluded / ignore 는 비교 때도 거른다 - 제외 목록을 고친 직후 다른 PC 가 아직 다시 스캔하지 않았어도 결과가 맞다.
+    depth (v01.56) 도 같다 - 지금 루트의 스캔 깊이 밖 파일은 비교에서 뺀다(다른 PC 가 깊게 스캔해 두었어도 거짓 Missing 없음)."""
     pcs = sorted(manifests.keys(), key=lambda p: (p != this_pc, p.lower()))
     rows = {}
     for pc in pcs:
@@ -125,6 +126,8 @@ def compare(manifests, this_pc, excluded=(), ignore=()):
             if not isinstance(entry, dict):
                 continue
             if ss.is_excluded(rel, excluded) or ss.is_ignored(rel, ignore):
+                continue
+            if not ss.within_depth(rel, depth):
                 continue
             key = ss.rel_key(rel)
             row = rows.get(key)
@@ -157,7 +160,7 @@ class DirStatus(object):
         return bool(self.lacking)
 
 
-def empty_dirs(manifests, this_pc, excluded=(), ignore=(), rows=None):
+def empty_dirs(manifests, this_pc, excluded=(), ignore=(), rows=None, depth=0):
     """빈 폴더 비교 -> [DirStatus] (경로순).
 
     - 어느 PC 의 manifest['empty_dirs'](가장 안쪽 빈 폴더) 에든 있는 폴더 중, **어느 PC 에도 그 아래 파일이 없고**
@@ -192,6 +195,8 @@ def empty_dirs(manifests, this_pc, excluded=(), ignore=(), rows=None):
             if d.lower() in has_files:
                 continue
             if ss.is_excluded(d + "/", excluded) or ss.is_ignored(d + "/", ignore):
+                continue
+            if not ss.within_depth(d, depth, is_dir=True):
                 continue
             found.setdefault(d.lower(), DirStatus(d))
     # 다른 빈 폴더의 위 폴더는 줄로 만들지 않는다(그 아래 줄이 있다)

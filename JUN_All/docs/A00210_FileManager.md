@@ -680,6 +680,8 @@ Change only the modified date of the checked files - the contents stay as they a
   같은 실제 폴더는 한 번만 센다 — 순환 정션 · 같은 대상을 가리키는 두 경로를 막고, **얕은 경로 · 이름 순**이 이긴다(PC 마다 같은 경로). 건너뛴 것은 스캔 로그에.
   정션 폴더는 Status · Excluded 트리에서 **연한 빨강**(A00240 Tree 와 같다), 툴팁에 가리키는 경로.
 - `Rename` 은 이름만(폴더 id 는 그대로), `Remove` 는 추적만 멈춘다(파일 · 저장된 매니페스트는 그대로).
+- **`Scan depth`** (v01.56): 루트 아래 몇 단계 폴더까지 스캔할지 — `All`(기본) · 1 = 루트와 그 바로 아래 폴더의 파일 · 2 = 한 단계 더 ….
+  루트마다 정하고 **모든 PC 가 공유**한다(비교가 맞게). 비교도 그 깊이로 거르므로 줄이면 Status 가 바로 좁혀진다. 늘렸으면 각 PC 에서 다시 Scan.
 
 ### Excluded — 제외 경로 · 무시 패턴
 

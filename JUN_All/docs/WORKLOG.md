@@ -33,6 +33,10 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-23 (오늘)
 
+> [!summary] **`A00210_FileManager` v01.56 — Sync 스캔 깊이** `#A00210_FileManager`
+- Roots 의 `Scan depth`(All · 1 · 2 …) — 루트마다 · 모든 PC 공유(`scan_depth`), 비교도 그 깊이로 걸러 거짓 Missing 없음, 경계 폴더는 빈 폴더로 안 적음, 매니페스트 `depth`.
+- 시험 `test_sync_depth.py` 19, 기존 sync 시험 그대로.
+
 > [!summary] **`A00210_FileManager` v01.55 — Sync 가 정션 폴더 · 그 안 파일을 스캔 + 정션 연한 빨강** `#A00210_FileManager`
 - 사용자: `C:\JUN` 을 Sync > Status 로 스캔하면 평범한 경로만 나오고 정션은 안 나온다. 원인 = 루트 안 정션을 기본으로 건너뜀(`Follow junctions` 기본 끔).
 - 기본으로 따라 들어가고 옵션은 `Skip junctions inside this root`(옛 follow 값은 무시). 실제 폴더 ID 로 순환 · 두 경로 중복을 한 번만, 얕은 경로 · 이름 순(PC 마다 같은 경로).

@@ -37,6 +37,7 @@ from Framework.qt.qt import (
     QLineEdit,
     QPushButton,
     QCheckBox,
+    QSpinBox,
     QComboBox,
     QProgressBar,
     QTreeWidget,
@@ -378,6 +379,22 @@ class SyncTab(QWidget):
         grid.addWidget(self.btn_rename_root, 1, 0)
         grid.addWidget(self.btn_remove_root, 1, 1)
         grid.addWidget(self.chk_follow, 1, 2)
+        # v01.56 스캔 깊이 (루트마다, 모든 PC 공유 - 비교가 맞게)
+        depth_row = QHBoxLayout()
+        depth_row.addWidget(QLabel("Scan depth"))
+        self.spn_depth = QSpinBox()
+        self.spn_depth.setRange(0, 99)
+        self.spn_depth.setSpecialValueText("All")
+        self.spn_depth.setToolTip(
+            "How many folder levels below the root to scan (All = every level).\n"
+            "1 = the files in the root and in its folders, 2 = one level deeper, ...\n"
+            "Shared with the other PCs (like the excluded paths) so the comparison matches.\n"
+            "Files deeper than this are left out of the scan and of the comparison.")
+        self.spn_depth.setKeyboardTracking(False)
+        self.spn_depth.valueChanged.connect(self._on_depth_changed)
+        depth_row.addWidget(self.spn_depth)
+        depth_row.addStretch(1)
+        grid.addLayout(depth_row, 2, 0, 1, 3)
         lay.addLayout(grid)
         return page
 
@@ -826,8 +843,10 @@ class SyncTab(QWidget):
     def _compare(self):
         root = self._current_root()
         ignore = self._settings.get("ignore_patterns") or []
-        self._rows = sc.compare(self._manifests, self._pc, self._excluded_for(root), ignore) if root else []
-        self._dirs = sc.empty_dirs(self._manifests, self._pc, self._excluded_for(root), ignore, self._rows) if root else []
+        depth = ss.clean_depth(root.get("scan_depth", 0)) if root else 0
+        self._rows = sc.compare(self._manifests, self._pc, self._excluded_for(root), ignore, depth=depth) if root else []
+        self._dirs = sc.empty_dirs(self._manifests, self._pc, self._excluded_for(root), ignore, self._rows,
+                                   depth=depth) if root else []
         self._update_pcs_label()
         self._rebuild_type_menu()
         self._populate_tree()
@@ -1256,7 +1275,8 @@ class SyncTab(QWidget):
         prev = sm.load_manifest(sm.manifest_path(data_dir, root["id"], self._pc))
         kw = dict(root_abs=path, root_id=root["id"], pc=self._pc, user=self._get_author() or "",
                   excluded=self._excluded_for(root), ignore=self._settings.get("ignore_patterns") or [],
-                  prev=prev, follow_junctions=not bool(root.get("skip_junctions")))
+                  prev=prev, follow_junctions=not bool(root.get("skip_junctions")),
+                  max_depth=ss.clean_depth(root.get("scan_depth", 0)))
         self._push_after_scan = push
         self._scan_root_id = root["id"]
         self._scan_started = time.time()
@@ -1560,6 +1580,10 @@ class SyncTab(QWidget):
         self.chk_follow.blockSignals(True)
         self.chk_follow.setChecked(bool(root and root.get("skip_junctions")))
         self.chk_follow.setEnabled(root is not None)
+        self.spn_depth.blockSignals(True)
+        self.spn_depth.setValue(ss.clean_depth(root.get("scan_depth", 0)) if root else 0)
+        self.spn_depth.setEnabled(root is not None)
+        self.spn_depth.blockSignals(False)
         self.chk_follow.blockSignals(False)
 
     def _on_roots_selection(self):
@@ -1663,6 +1687,17 @@ class SyncTab(QWidget):
             self._root_id = ""
             self._log("Sync: removed root '{0}' - push to share.".format(root["name"]))
             self.on_refresh(quiet=True)
+
+    def _on_depth_changed(self, value):
+        """v01.56 스캔 깊이 - 공유 설정에 저장, 비교는 바로 그 깊이로 다시(스캔은 다음 Scan 부터)."""
+        root = self._current_root()
+        if not root:
+            return
+        root["scan_depth"] = ss.clean_depth(value)
+        if self._save_settings():
+            self._log("Sync: '{0}' scan depth = {1} (shared with the other PCs; scan again to apply).".format(
+                root["name"], value or "All"))
+        self.on_refresh(quiet=True)
 
     def _on_follow_toggled(self, on):
         root = self._current_root()

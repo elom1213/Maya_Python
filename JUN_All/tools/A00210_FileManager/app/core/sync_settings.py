@@ -14,6 +14,7 @@
 #               "excluded_paths": ["00_00_02_자료/", "x/y.mb"], "skip_junctions": false}],
 #   v01.55: follow_junctions(기본 false) → skip_junctions(기본 false) - 정션을 기본으로 따라 들어간다.
 #           옛 follow_junctions 값은 읽지 않는다(기본값 그대로 저장돼 있어 정션이 계속 안 보이게 된다).
+#   v01.56: "scan_depth": 0 (= 전부) - 루트 아래 몇 단계 폴더까지 스캔할지. **모든 PC 가 공유**(비교가 맞게).
 #    "ignore_patterns": ["**/backup/**", ...],
 #    "pc_names": {"P4T7MBN": "Office"}}      ← v01.50 PC 표시 이름(툴 안에서만). 매니페스트 파일 이름은 그대로 PC id.
 #
@@ -186,7 +187,25 @@ def new_root(name, default_path, existing_ids=()):
         "default_path": str(default_path or "").replace("\\", "/"),
         "excluded_paths": [],
         "skip_junctions": False,
+        "scan_depth": 0,
     }
+
+
+def clean_depth(value):
+    """스캔 깊이 0(전부) ~ 99."""
+    try:
+        return max(0, min(99, int(value)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def within_depth(rel, depth, is_dir=False):
+    """rel 이 깊이 안인가 (depth 0 = 전부). 파일 a/b/c.mb = 폴더 깊이 2, 폴더 a/b = 깊이 2."""
+    if not depth:
+        return True
+    rel = str(rel).strip("/")
+    n = rel.count("/") + (1 if is_dir else 0)
+    return n <= depth
 
 
 def find_root(settings, root_id):
@@ -248,6 +267,7 @@ def _clean(data):
                 "default_path": str(r.get("default_path") or "").replace("\\", "/"),
                 "excluded_paths": ex,
                 "skip_junctions": bool(r.get("skip_junctions", False)),
+                "scan_depth": clean_depth(r.get("scan_depth", 0)),
             })
         out["roots"] = roots
         if isinstance(data.get("ignore_patterns"), list):

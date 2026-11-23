@@ -63,5 +63,9 @@
 #        옵션은 반대로 `Skip junctions inside this root`(skip_junctions, 기본 끔) - 옛 follow_junctions 값은 읽지 않는다.
 #        정션 표시: Status · Excluded 트리의 정션 폴더를 A00240 Tree 와 같은 연한 빨강(아이콘 · 글자) + 'Junction -> 대상' 툴팁.
 
-VERSION = "01.55"
+# 01.56  Sync: 스캔 깊이 - Roots 의 `Scan depth`(All = 전부, 1 = 루트 + 바로 아래 폴더의 파일, ...). 루트마다 · 모든 PC 공유(scan_depth).
+#        비교도 지금 깊이로 거른다(다른 PC 가 깊게 스캔해 두었어도 거짓 Missing 없음). 깊이 때문에 안 본 하위가 있는 폴더는 빈 폴더로 안 적는다.
+#        매니페스트에 "depth" 기록.
+
+VERSION = "01.56"
 LAST_UPDATE = "2026-11-23"

@@ -32,3 +32,5 @@ metadata:
 - v01.55 (2026-11-23): **루트 안 정션을 기본으로 따라 들어간다**(C:/JUN 스캔 때 정션 폴더 · 안 파일이 Status 에 안 나왔다 - 사용자). 옵션 = `skip_junctions`(기본 false), 옛 `follow_junctions` 는 읽지 않음(기본값 false 로 저장돼 있어서).
   순환 · 중복 = 실제 폴더 `(st_dev, st_ino)`(os.stat 은 정션 대상을 따름) 기억, **너비 우선 + 이름 순**이라 얕은 경로가 이김(PC 마다 같은 rel). 보고 `duplicates`.
   Status · Excluded 정션 = A00240 Tree 와 같은 연한 빨강(Framework `tree_scanner.junction_info` 추가, `JUNCTION_COLOR` · `_tinted_icon`). 시험은 실제 `mklink /J`. GUI 확인 아직.
+- v01.56 (2026-11-23): **스캔 깊이** `scan_depth`(루트마다, 0 = 전부, **공유** - PC 마다 다르면 거짓 Missing). 깊이 N = rel 의 '/' 가 N 개 이하인 파일.
+  compare · empty_dirs 도 지금 깊이로 거른다(`ss.within_depth`). 깊이 때문에 하위를 안 본 폴더(cut_out)는 빈 폴더 아님. 매니페스트 `depth`. GUI 확인 아직.

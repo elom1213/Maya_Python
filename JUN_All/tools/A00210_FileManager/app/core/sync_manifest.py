@@ -18,6 +18,8 @@
 #   순환 · 두 번 세기 막기: 들어간 **실제 폴더**(os.stat 의 장치 + 파일 ID, 정션은 대상의 ID)를 기억해 다시 만나면 건너뛴다.
 #   어느 경로로 셀지는 **얕은 것 먼저 · 이름 순**(너비 우선) - PC 마다 같은 경로로 기록돼야 매니페스트 비교가 맞는다.
 #   건너뛴 중복은 보고의 "duplicates" 에 [(건너뛴 경로, 먼저 센 경로)].
+# - v01.56: 깊이 제한(루트별 scan_depth, 0 = 전부). 깊이 N = 루트 아래 N 단계 폴더까지 들어간다 - 파일은 rel 의 '/' 가 N 개 이하.
+#   깊이 때문에 들어가지 않은 하위 폴더가 있는 폴더는 빈 폴더로 적지 않는다. 매니페스트 "depth" 에 그때의 깊이.
 # - 구글 드라이브 웹 다운로드는 수정 시각을 지키지 않는다 → 같음 · 앞뒤 판정은 해시로(sync_compare).
 
 import hashlib
@@ -136,12 +138,14 @@ def _dir_key(path):
 
 
 def list_files(root_abs, excluded=(), ignore=(), follow_junctions=True, cancel=None, dirs_out=None,
-               duplicates_out=None):
+               duplicates_out=None, max_depth=0, cut_out=None):
     """(rel, abs_path, os.stat_result) 목록. 제외 폴더 안으로는 들어가지 않는다.
 
     dirs_out : 리스트를 주면 들어간 폴더의 상대 경로(끝 '/' 없음)를 담는다(v01.51 빈 폴더 기록용).
     follow_junctions : True(v01.55 기본) = 정션 · 링크 폴더 안으로도 들어간다. 같은 실제 폴더는 한 번만.
-    duplicates_out : 리스트를 주면 이미 센 실제 폴더라 건너뛴 것 (경로, 먼저 센 경로) 를 담는다."""
+    duplicates_out : 리스트를 주면 이미 센 실제 폴더라 건너뛴 것 (경로, 먼저 센 경로) 를 담는다.
+    max_depth : v01.56 루트 아래 몇 단계 폴더까지 들어갈지 (0 = 전부). 1 = 루트 + 바로 아래 폴더의 파일.
+    cut_out : 리스트를 주면 깊이 때문에 하위 폴더를 건너뛴 폴더(상대 경로, 루트는 "")를 담는다 - 빈 폴더로 적지 않게."""
     out = []
     errors = []
     seen = {}
@@ -166,6 +170,10 @@ def list_files(root_abs, excluded=(), ignore=(), follow_junctions=True, cancel=N
                 continue
             if is_dir:
                 if ss.is_excluded(rel + "/", excluded) or ss.is_ignored(rel + "/", ignore):
+                    continue
+                if max_depth and rel.count("/") + 1 > max_depth:      # 깊이 밖 - 들어가지 않는다
+                    if cut_out is not None and (not cut_out or cut_out[-1] != rel_dir):
+                        cut_out.append(rel_dir)
                     continue
                 if not follow_junctions and _is_link_dir(entry):
                     continue
@@ -219,7 +227,7 @@ def _prev_index(prev):
 
 
 def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
-         follow_junctions=True, progress=None, cancel=None):
+         follow_junctions=True, progress=None, cancel=None, max_depth=0):
     """루트를 스캔해 새 매니페스트와 보고(dict)를 돌려준다.
 
     progress(done_bytes, total_bytes, rel) - 해시할 바이트 기준. cancel() 이 True 면 ScanCancelled."""
@@ -228,11 +236,12 @@ def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
 
     all_dirs = []
     duplicates = []
+    cut = []
     files, errors = list_files(root_abs, excluded, ignore, follow_junctions, cancel, dirs_out=all_dirs,
-                               duplicates_out=duplicates)
+                               duplicates_out=duplicates, max_depth=max_depth, cut_out=cut)
     # v01.51 빈 폴더 = 아래에 추적하는 파일이 하나도 없는 폴더(제외 · 무시된 파일만 있어도 빈 폴더). 파일이 없으니 files 로는 안 보인다.
     # **가장 안쪽 것만** 적는다(a/ 와 a/b/ 가 둘 다 비었으면 a/b 만) - 위 폴더는 경로로 따라 나온다.
-    full = set()                     # 파일이 있거나 하위 폴더가 있는 폴더
+    full = set(d.lower() for d in cut if d)     # 깊이 때문에 하위를 안 본 폴더는 비었다고 할 수 없다 (v01.56)
     for rel in [f[0] for f in files] + all_dirs:
         d = rel.rpartition("/")[0]
         while d and d.lower() not in full:
@@ -308,6 +317,7 @@ def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
         "scanned_epoch": now,
         "files": result,
         "empty_dirs": empty_dirs,
+        "depth": int(max_depth or 0),    # v01.56 스캔 깊이 (0 = 전부)
     }
     report = {
         "files": len(result),
