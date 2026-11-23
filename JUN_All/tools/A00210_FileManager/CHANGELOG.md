@@ -2,6 +2,11 @@
 
 All notable changes to this tool are documented here.
 
+## [01.58] - 2026-11-23
+
+- **[Sync] Status 탭에도 `Scan depth`**(사용자) — 버튼 줄 오른쪽. Roots 탭의 칸과 **같은 설정**(루트의 공유 `scan_depth`)이라 한쪽을 바꾸면 다른 쪽도 바로 같아진다.
+- 시험 `test_sync_depth.py` +3(Status 칸 · Status 에서 바꾸면 저장 + Roots 칸 · Roots 에서 바꾸면 Status 칸) = 22.
+
 ## [01.57] - 2026-11-23
 
 - **[Sync] `Preview` 버튼**(Status, Scan 앞 — 사용자). 스캔하기 전에 루트 아래에 **어떤 폴더 · 파일이 있는지만** 빠르게 본다.

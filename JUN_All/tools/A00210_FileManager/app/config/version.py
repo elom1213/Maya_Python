@@ -70,5 +70,7 @@
 # 01.57  Sync > Status `Preview` - 스캔 전에 루트 아래 폴더 · 파일이 있는지만 빠르게(A00240 Tree 와 같은 공용 fileTree, Adaptive,
 #        정션 연한 빨강 · Filter · File Types · Reveal). 해시 · 비교 없음 - 200 MB 시험 루트에서 0.01 s vs 스캔 0.94 s.
 
-VERSION = "01.57"
+# 01.58  Sync > Status 에도 `Scan depth` 칸 - Roots 의 칸과 같은 설정(루트의 공유 scan_depth), 한쪽을 바꾸면 다른 쪽도 바로.
+
+VERSION = "01.58"
 LAST_UPDATE = "2026-11-23"

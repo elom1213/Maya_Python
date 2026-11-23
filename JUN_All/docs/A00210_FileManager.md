@@ -684,6 +684,7 @@ Change only the modified date of the checked files - the contents stay as they a
   (폴더를 펼칠 때 읽기 · 정션 연한 빨강 · Filter · File Types · Reveal). 스캔보다 훨씬 빠르다(시험 200 MB: 0.01 초 vs 0.94 초).
 - **`Scan depth`** (v01.56): 루트 아래 몇 단계 폴더까지 스캔할지 — `All`(기본) · 1 = 루트와 그 바로 아래 폴더의 파일 · 2 = 한 단계 더 ….
   루트마다 정하고 **모든 PC 가 공유**한다(비교가 맞게). 비교도 그 깊이로 거르므로 줄이면 Status 가 바로 좁혀진다. 늘렸으면 각 PC 에서 다시 Scan.
+  Status 탭 버튼 줄에도 같은 칸이 있다(v01.58 — 같은 설정, 서로 맞춰진다).
 
 ### Excluded — 제외 경로 · 무시 패턴
 

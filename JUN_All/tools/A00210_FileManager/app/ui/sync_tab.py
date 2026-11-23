@@ -231,6 +231,17 @@ class SyncTab(QWidget):
         for b in (self.btn_preview, self.btn_scan_push, self.btn_scan, self.btn_pull, self.btn_refresh):
             act.addWidget(b)
         act.addStretch(1)
+        # v01.58 Scan depth 를 Status 에서도 - Roots 의 칸과 같은 설정(루트의 공유 scan_depth), 한쪽을 바꾸면 다른 쪽도
+        act.addWidget(QLabel("Scan depth"))
+        self.spn_depth_status = QSpinBox()
+        self.spn_depth_status.setRange(0, 99)
+        self.spn_depth_status.setSpecialValueText("All")
+        self.spn_depth_status.setKeyboardTracking(False)
+        self.spn_depth_status.setToolTip(
+            "How many folder levels below the root to scan (All = every level) - the same setting as Roots > Scan depth.\n"
+            "Shared with the other PCs. Lowering it narrows the Status at once; scan again after raising it.")
+        self.spn_depth_status.valueChanged.connect(self._on_depth_changed)
+        act.addWidget(self.spn_depth_status)
         lay.addLayout(act)
 
         prog = QHBoxLayout()
@@ -1623,10 +1634,7 @@ class SyncTab(QWidget):
         self.chk_follow.blockSignals(True)
         self.chk_follow.setChecked(bool(root and root.get("skip_junctions")))
         self.chk_follow.setEnabled(root is not None)
-        self.spn_depth.blockSignals(True)
-        self.spn_depth.setValue(ss.clean_depth(root.get("scan_depth", 0)) if root else 0)
-        self.spn_depth.setEnabled(root is not None)
-        self.spn_depth.blockSignals(False)
+        self._show_depth(root)
         self.chk_follow.blockSignals(False)
 
     def _on_roots_selection(self):
@@ -1731,12 +1739,22 @@ class SyncTab(QWidget):
             self._log("Sync: removed root '{0}' - push to share.".format(root["name"]))
             self.on_refresh(quiet=True)
 
+    def _show_depth(self, root):
+        """두 Scan depth 칸(Roots · Status, v01.58)을 루트 값으로 - 신호 없이."""
+        value = ss.clean_depth(root.get("scan_depth", 0)) if root else 0
+        for spin in (self.spn_depth, self.spn_depth_status):
+            spin.blockSignals(True)
+            spin.setValue(value)
+            spin.setEnabled(root is not None)
+            spin.blockSignals(False)
+
     def _on_depth_changed(self, value):
         """v01.56 스캔 깊이 - 공유 설정에 저장, 비교는 바로 그 깊이로 다시(스캔은 다음 Scan 부터)."""
         root = self._current_root()
         if not root:
             return
         root["scan_depth"] = ss.clean_depth(value)
+        self._show_depth(root)                         # 다른 칸도 같은 값으로 (v01.58)
         if self._save_settings():
             self._log("Sync: '{0}' scan depth = {1} (shared with the other PCs; scan again to apply).".format(
                 root["name"], value or "All"))

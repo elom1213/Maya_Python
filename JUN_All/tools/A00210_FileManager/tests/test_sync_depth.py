@@ -133,6 +133,19 @@ try:
           "a/a1.txt" in seen1, sorted(r for r in seen1 if r))
     tab.spn_depth.setValue(0)
     check("UI: back to All", tab._current_root()["scan_depth"] == 0)
+    # v01.58 Status 탭에도 같은 칸
+    check("UI Status: a Scan depth box in the Status buttons row, same value (All)",
+          tab.spn_depth_status.value() == 0 and tab.spn_depth_status.text() == "All" and tab.spn_depth_status.isEnabled())
+    tab.spn_depth_status.setValue(3)
+    app.processEvents()
+    check("UI Status: changing it there saves the shared setting and updates the Roots box",
+          tab._current_root()["scan_depth"] == 3 and tab.spn_depth.value() == 3 and
+          json.load(open(ss.settings_path(data_dir), encoding="utf-8"))["roots"][0]["scan_depth"] == 3)
+    tab.spn_depth.setValue(1)
+    app.processEvents()
+    check("UI Roots: changing it in Roots updates the Status box", tab.spn_depth_status.value() == 1 and
+          tab._current_root()["scan_depth"] == 1)
+    tab.spn_depth.setValue(0)
     tab.shutdown()
     tab.close()
     app.processEvents()
