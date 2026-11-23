@@ -20,7 +20,7 @@ import time
 
 from Framework.core.file_opener import open_path
 from Framework.core.tree_scanner import junction_info
-from Framework.qt.MOD_fileTree_qt_v01 import JUNCTION_COLOR, _tinted_icon
+from Framework.qt.MOD_fileTree_qt_v01 import JUNCTION_COLOR, _tinted_icon, JUN_mod_fileTree_qt_v01
 from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
 from Framework.qt.MOD_checkTree_qt_v01 import JUN_mod_checkTree_qt_v01
@@ -154,6 +154,8 @@ class SyncTab(QWidget):
         self._types_off = set()                    # File Types 에서 끈 확장자(점 없음 · 소문자, "" = 확장자 없음)
         self._type_actions = {}
         self._thread = None
+        self._preview = None             # v01.57 Preview 창 (처음 누를 때 만든다)
+        self._preview_tree = None
         self._push_after_scan = False
         self._populated_once = False
 
@@ -219,7 +221,14 @@ class SyncTab(QWidget):
         self.btn_refresh = QPushButton("Refresh")
         self.btn_refresh.setToolTip("Re-read manifests from the data folder and compare (no git).")
         self.btn_refresh.clicked.connect(self.on_refresh)
-        for b in (self.btn_scan_push, self.btn_scan, self.btn_pull, self.btn_refresh):
+        # v01.57 Preview - 스캔 전에 어떤 폴더 · 파일이 있는지만 빠르게 (A00240 Tree 와 같은 공용 트리, 해시 · 비교 없음)
+        self.btn_preview = QPushButton("Preview")
+        self.btn_preview.setToolTip(
+            "Quickly see which folders and files exist under the root - before scanning.\n"
+            "No hashing and no status: the same tree as A00240 PathTool > Tree (folders are read when you open them,\n"
+            "junctions in light red, Filter, File Types, right-click Reveal). Much faster than a scan.")
+        self.btn_preview.clicked.connect(self.on_preview)
+        for b in (self.btn_preview, self.btn_scan_push, self.btn_scan, self.btn_pull, self.btn_refresh):
             act.addWidget(b)
         act.addStretch(1)
         lay.addLayout(act)
@@ -1249,6 +1258,40 @@ class SyncTab(QWidget):
 
     # ============================================================== scan
 
+    # ---------------------------------------------------------------- Preview (v01.57)
+
+    def on_preview(self):
+        """스캔 전 미리보기 - 지금 루트를 공용 폴더 트리(JUN_mod_fileTree_qt_v01)로. 상태 진단 없이 존재만.
+
+        Adaptive(펼치는 폴더만 그때 한 겹씩 읽기)라 깊은 루트도 바로 열린다 - 스캔(파일마다 해시)보다 훨씬 빠르다.
+        창은 하나를 다시 쓰고(비모달), 루트를 바꾸고 다시 누르면 그 루트로 다시 그린다."""
+        root = self._current_root()
+        path = self._root_abs(root) if root else ""
+        if not root or not path or not os.path.isdir(path):
+            QMessageBox.warning(self, "Preview", "The root folder is not available on this PC:\n{0}\n"
+                                                 "Use Roots > Set Path on This PC.".format(path or "(not set)"))
+            return
+        if self._preview is None:
+            dlg = QDialog(self.window())
+            dlg.setWindowFlags(dlg.windowFlags() | Qt.Window)
+            dlg.resize(720, 760)
+            lay = QVBoxLayout(dlg)
+            info = QLabel("Existence only - no hashing, no status. Folders are read when you open them.")
+            info.setWordWrap(True)
+            lay.addWidget(info)
+            self._preview_tree = JUN_mod_fileTree_qt_v01(dlg, zoom_key="A00210_FileManager/sync_preview")
+            lay.addWidget(self._preview_tree, 1)
+            self._preview = dlg
+        self._preview.setWindowTitle("Preview - {0}  ({1})".format(root["name"], ui_path(path)))
+        tree = self._preview_tree
+        tree.chk_adaptive.setChecked(True)            # 빠르게 - 펼치는 폴더만 읽는다
+        tree.ipf_path.setText(ui_path(path))
+        tree.on_build()
+        self._preview.show()
+        self._preview.raise_()
+        self._preview.activateWindow()
+        self._log("Sync: preview of '{0}' (existence only, no scan).".format(root["name"]))
+
     def _busy(self, on):
         for b in (self.btn_scan_push, self.btn_scan, self.btn_pull, self.btn_refresh, self.cmb_root):
             b.setEnabled(not on)
@@ -1710,7 +1753,9 @@ class SyncTab(QWidget):
     # ============================================================== close
 
     def shutdown(self):
-        """창을 닫을 때 - 스캔 중이면 멈추고 기다린다."""
+        """창을 닫을 때 - 스캔 중이면 멈추고 기다린다. Preview 창도 닫는다."""
+        if self._preview is not None:
+            self._preview.close()
         if self._thread is not None:
             self._thread.cancel()
             self._thread.wait(5000)

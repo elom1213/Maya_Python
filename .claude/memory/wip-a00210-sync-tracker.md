@@ -34,3 +34,4 @@ metadata:
   Status · Excluded 정션 = A00240 Tree 와 같은 연한 빨강(Framework `tree_scanner.junction_info` 추가, `JUNCTION_COLOR` · `_tinted_icon`). 시험은 실제 `mklink /J`. GUI 확인 아직.
 - v01.56 (2026-11-23): **스캔 깊이** `scan_depth`(루트마다, 0 = 전부, **공유** - PC 마다 다르면 거짓 Missing). 깊이 N = rel 의 '/' 가 N 개 이하인 파일.
   compare · empty_dirs 도 지금 깊이로 거른다(`ss.within_depth`). 깊이 때문에 하위를 안 본 폴더(cut_out)는 빈 폴더 아님. 매니페스트 `depth`. GUI 확인 아직.
+- v01.57 (2026-11-23): Status `Preview` = 공용 `JUN_mod_fileTree_qt_v01`(A00240 Tree) 비모달 창, Adaptive 로 지금 루트 - 해시 · 비교 없음(200 MB 0.01 s vs 스캔 0.94 s). GUI 확인 아직.

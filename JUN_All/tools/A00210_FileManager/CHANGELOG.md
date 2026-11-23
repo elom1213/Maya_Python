@@ -2,6 +2,14 @@
 
 All notable changes to this tool are documented here.
 
+## [01.57] - 2026-11-23
+
+- **[Sync] `Preview` 버튼**(Status, Scan 앞 — 사용자). 스캔하기 전에 루트 아래에 **어떤 폴더 · 파일이 있는지만** 빠르게 본다.
+  - **상태 진단 없음**(해시 · 비교 · 매니페스트 없음) — A00240 PathTool > Tree 와 **같은 공용 트리**(`JUN_mod_fileTree_qt_v01`)를 비모달 창으로 띄운다.
+  - Adaptive(폴더를 펼칠 때 그 한 겹만 읽기)라 깊은 루트도 바로 열린다 — 200 MB 시험 루트에서 **0.01 초 vs 스캔 0.94 초**.
+  - 정션 연한 빨강 · Filter · File Types · 우클릭 Reveal / Copy path · Ctrl + 휠 글자 크기 · Expand 가 그대로. 창은 하나를 다시 쓰고, 다시 누르면 지금 루트로 다시 그린다.
+- 시험 `tests/test_sync_preview.py` 11항목(창 · 루트 내용 · Adaptive · 정션 빨강 · 정션 펼치기 · 스캔 안 함 · 스캔보다 빠름 · 창 재사용 · 함께 닫힘). 기존 Sync 시험 그대로.
+
 ## [01.56] - 2026-11-23
 
 - **[Sync] 스캔 깊이**(사용자 — 지금은 모든 깊이를 스캔한다). Roots 에 **`Scan depth`**: `All`(기본) · 1 = 루트와 그 바로 아래 폴더의 파일 · 2 = 한 단계 더 · …

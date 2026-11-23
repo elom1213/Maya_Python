@@ -33,6 +33,9 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-23 (오늘)
 
+> [!summary] **`A00210_FileManager` v01.57 — Sync > Status `Preview`** `#A00210_FileManager`
+- 스캔 전에 존재만 빠르게: A00240 Tree 와 같은 공용 fileTree 를 비모달 창으로(Adaptive · 정션 빨강), 해시 · 비교 없음 — 200 MB 0.01 s vs 스캔 0.94 s. 시험 `test_sync_preview.py` 11.
+
 > [!summary] **`A00210_FileManager` v01.56 — Sync 스캔 깊이** `#A00210_FileManager`
 - Roots 의 `Scan depth`(All · 1 · 2 …) — 루트마다 · 모든 PC 공유(`scan_depth`), 비교도 그 깊이로 걸러 거짓 Missing 없음, 경계 폴더는 빈 폴더로 안 적음, 매니페스트 `depth`.
 - 시험 `test_sync_depth.py` 19, 기존 sync 시험 그대로.

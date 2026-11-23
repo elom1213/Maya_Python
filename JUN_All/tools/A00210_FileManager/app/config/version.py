@@ -67,5 +67,8 @@
 #        비교도 지금 깊이로 거른다(다른 PC 가 깊게 스캔해 두었어도 거짓 Missing 없음). 깊이 때문에 안 본 하위가 있는 폴더는 빈 폴더로 안 적는다.
 #        매니페스트에 "depth" 기록.
 
-VERSION = "01.56"
+# 01.57  Sync > Status `Preview` - 스캔 전에 루트 아래 폴더 · 파일이 있는지만 빠르게(A00240 Tree 와 같은 공용 fileTree, Adaptive,
+#        정션 연한 빨강 · Filter · File Types · Reveal). 해시 · 비교 없음 - 200 MB 시험 루트에서 0.01 s vs 스캔 0.94 s.
+
+VERSION = "01.57"
 LAST_UPDATE = "2026-11-23"
