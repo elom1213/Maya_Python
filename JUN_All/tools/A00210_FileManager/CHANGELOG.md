@@ -2,6 +2,19 @@
 
 All notable changes to this tool are documented here.
 
+## [01.55] - 2026-11-23
+
+- **[Sync] 정션 폴더도 스캔한다**(사용자 — `C:\JUN` 을 스캔하면 평범한 폴더만 나오고 정션 폴더 · 그 안 파일이 Status 에 안 나왔다).
+  - 원인: 스캔이 루트 **안의** 정션을 기본으로 건너뛰었다(`Follow junctions inside this root` 기본 끔). `C:\JUN` 은 하위가 거의 정션이라 거의 다 빠졌다.
+  - 이제 **기본으로 따라 들어간다.** 옵션은 반대 뜻 **`Skip junctions inside this root`**(기본 끔)로 바꿨다. 옛 `follow_junctions: false` 는 기본값 그대로 저장돼 있던 것이라 읽지 않는다.
+  - 옵션이 막던 위험은 그대로 막는다: 들어간 **실제 폴더**(장치 + 파일 ID — 정션은 대상의 ID)를 기억해 **순환 정션**(위를 가리킴)과
+    **같은 폴더를 두 경로로**(예: `JUN_Cage` 와 `JUN_Src_Rig\02_Cage_v02`) 두 번 세지 않는다. 어느 경로로 셀지는 **얕은 것 먼저 · 이름 순** — PC 마다 같은 경로로 기록돼야 비교가 맞는다.
+    건너뛴 것은 스캔 로그에 `... counted once: <건너뛴> = <먼저 센 경로>`.
+- **[Sync] 정션 표시** — Status · Excluded 트리의 정션 폴더를 **A00240 Tree 와 같은 연한 빨강**(아이콘 물들임 · 글자) + 툴팁 `Junction -> 대상`.
+  판별 · 색은 Framework 그대로(`tree_scanner.junction_info` 추가 · `MOD_fileTree_qt_v01.JUNCTION_COLOR`).
+- 시험 `tests/test_sync_junctions.py` 19항목(실제 `mklink /J` — 정션 안 파일 · 같은 대상 한 번 · 순환 · 빈 대상 · 같은 순서 · Skip = 예전 · 설정 · UI 스캔 · 빨강 · 로그 · Excluded 빨강).
+  `test_sync_core` 의 "정션은 기본으로 건너뜀" 은 새 기본으로 고쳤다(65/65). `test_sync_ui` 108/108.
+
 ## [01.54] - 2026-11-20
 
 - **[Maya > File Date] 새 하위탭 — 체크한 `.ma` · `.mb` · `.fbx` 의 수정한 날짜만 바꾼다(내용 그대로).**

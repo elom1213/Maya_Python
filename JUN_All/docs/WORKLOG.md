@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-23 (오늘)
 
+> [!summary] **`A00210_FileManager` v01.55 — Sync 가 정션 폴더 · 그 안 파일을 스캔 + 정션 연한 빨강** `#A00210_FileManager`
+- 사용자: `C:\JUN` 을 Sync > Status 로 스캔하면 평범한 경로만 나오고 정션은 안 나온다. 원인 = 루트 안 정션을 기본으로 건너뜀(`Follow junctions` 기본 끔).
+- 기본으로 따라 들어가고 옵션은 `Skip junctions inside this root`(옛 follow 값은 무시). 실제 폴더 ID 로 순환 · 두 경로 중복을 한 번만, 얕은 경로 · 이름 순(PC 마다 같은 경로).
+- Status · Excluded 트리의 정션을 A00240 Tree 와 같은 연한 빨강 + `Junction -> 대상`(Framework `tree_scanner.junction_info` 추가).
+- 시험 `test_sync_junctions.py` 19(실제 mklink /J), `test_sync_core` 65 · `test_sync_ui` 108 · Framework tree 시험 그대로.
+
 > [!summary] **`A00240_PathTool` v01.34 — Tree 탭 글자 확대 / 축소** `#A00240_PathTool`
 - 요청: Tree 탭에 글자 확대 기능 — A00110 View > Layers 의 것을 참고.
 - 공용 `MOD_viewZoom_qt_v01`(A00110 v02.38 에서 만든 것)을 Framework `fileTree` 에 `zoom_key` 옵션으로 붙이고(기본 끔 → A00210 · Junction 팝업 그대로) A00240 만 켰다.

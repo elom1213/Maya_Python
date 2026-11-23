@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-05
+# last Update date : 2026-11-23
 # A00210_FileManager - Sync 탭: PC 매니페스트 스캔 · 저장 (UI/DCC 비의존)
 #
 # v01.47 : 한 PC 가 한 추적 루트 아래에 가진 파일 목록 = 매니페스트(json 하나).
@@ -13,13 +13,17 @@
 # - 크기 + 수정 시각(ns)이 직전 매니페스트와 같으면 해시를 다시 계산하지 않는다(캐시). 바뀐 파일만 SHA-256.
 # - 해시 전후로 크기 · 시각이 바뀌면(마야가 저장 중) 그 파일은 건너뛰고 직전 값을 유지한다.
 # - history = 이 PC 에서 이 경로가 가졌던 해시(최근 HISTORY_MAX 개, 마지막이 지금 것). 앞뒤 판정의 근거.
-# - 루트 **안의** 정션 · 심볼릭 링크 폴더는 기본으로 따라 들어가지 않는다(루트별 follow_junctions).
-#   루트 자체가 정션인 것은 상관없다(C:/JUN/JUN_MUE).
+# - v01.55: 루트 **안의** 정션 · 심볼릭 링크 폴더도 **기본으로 따라 들어간다**(C:/JUN 처럼 하위가 정션인 구조 - 사용자).
+#   전에는 기본으로 건너뛰어 정션 안 파일이 Status 에 안 나왔다. 루트별 skip_junctions 로 끌 수 있다.
+#   순환 · 두 번 세기 막기: 들어간 **실제 폴더**(os.stat 의 장치 + 파일 ID, 정션은 대상의 ID)를 기억해 다시 만나면 건너뛴다.
+#   어느 경로로 셀지는 **얕은 것 먼저 · 이름 순**(너비 우선) - PC 마다 같은 경로로 기록돼야 매니페스트 비교가 맞는다.
+#   건너뛴 중복은 보고의 "duplicates" 에 [(건너뛴 경로, 먼저 센 경로)].
 # - 구글 드라이브 웹 다운로드는 수정 시각을 지키지 않는다 → 같음 · 앞뒤 판정은 해시로(sync_compare).
 
 import hashlib
 import json
 import os
+from collections import deque
 import stat as stat_mod
 import time
 
@@ -120,19 +124,37 @@ def _is_link_dir(entry):
     return bool(getattr(st, "st_file_attributes", 0) & _REPARSE)
 
 
-def list_files(root_abs, excluded=(), ignore=(), follow_junctions=False, cancel=None, dirs_out=None):
+def _dir_key(path):
+    """실제 폴더의 정체 - 정션 · 링크는 따라간 대상의 (장치, 파일 ID). ID 가 없으면 realpath."""
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    if getattr(st, "st_ino", 0):
+        return (st.st_dev, st.st_ino)
+    return os.path.normcase(os.path.realpath(path))
+
+
+def list_files(root_abs, excluded=(), ignore=(), follow_junctions=True, cancel=None, dirs_out=None,
+               duplicates_out=None):
     """(rel, abs_path, os.stat_result) 목록. 제외 폴더 안으로는 들어가지 않는다.
 
-    dirs_out : 리스트를 주면 들어간 폴더의 상대 경로(끝 '/' 없음)를 담는다(v01.51 빈 폴더 기록용)."""
+    dirs_out : 리스트를 주면 들어간 폴더의 상대 경로(끝 '/' 없음)를 담는다(v01.51 빈 폴더 기록용).
+    follow_junctions : True(v01.55 기본) = 정션 · 링크 폴더 안으로도 들어간다. 같은 실제 폴더는 한 번만.
+    duplicates_out : 리스트를 주면 이미 센 실제 폴더라 건너뛴 것 (경로, 먼저 센 경로) 를 담는다."""
     out = []
     errors = []
-    stack = [("", root_abs)]
-    while stack:
+    seen = {}
+    root_key = _dir_key(root_abs)
+    if root_key is not None:
+        seen[root_key] = ""
+    queue = deque([("", root_abs)])            # 너비 우선 + 이름 순 = 얕은 경로가 먼저 (PC 마다 같은 결과)
+    while queue:
         if cancel and cancel():
             raise ScanCancelled()
-        rel_dir, abs_dir = stack.pop()
+        rel_dir, abs_dir = queue.popleft()
         try:
-            entries = list(os.scandir(abs_dir))
+            entries = sorted(os.scandir(abs_dir), key=lambda e: e.name.lower())
         except OSError as exc:
             errors.append("{0}: {1}".format(rel_dir or ".", exc))
             continue
@@ -147,7 +169,14 @@ def list_files(root_abs, excluded=(), ignore=(), follow_junctions=False, cancel=
                     continue
                 if not follow_junctions and _is_link_dir(entry):
                     continue
-                stack.append((rel, entry.path))
+                key = _dir_key(entry.path)
+                if key is not None:
+                    if key in seen:              # 순환(위를 가리키는 정션) · 같은 폴더를 다른 경로로 - 한 번만 센다
+                        if duplicates_out is not None:
+                            duplicates_out.append((rel, seen[key]))
+                        continue
+                    seen[key] = rel
+                queue.append((rel, entry.path))
                 if dirs_out is not None:
                     dirs_out.append(rel)
                 continue
@@ -190,7 +219,7 @@ def _prev_index(prev):
 
 
 def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
-         follow_junctions=False, progress=None, cancel=None):
+         follow_junctions=True, progress=None, cancel=None):
     """루트를 스캔해 새 매니페스트와 보고(dict)를 돌려준다.
 
     progress(done_bytes, total_bytes, rel) - 해시할 바이트 기준. cancel() 이 True 면 ScanCancelled."""
@@ -198,7 +227,9 @@ def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
         raise OSError("Root folder not found: {0}".format(root_abs))
 
     all_dirs = []
-    files, errors = list_files(root_abs, excluded, ignore, follow_junctions, cancel, dirs_out=all_dirs)
+    duplicates = []
+    files, errors = list_files(root_abs, excluded, ignore, follow_junctions, cancel, dirs_out=all_dirs,
+                               duplicates_out=duplicates)
     # v01.51 빈 폴더 = 아래에 추적하는 파일이 하나도 없는 폴더(제외 · 무시된 파일만 있어도 빈 폴더). 파일이 없으니 files 로는 안 보인다.
     # **가장 안쪽 것만** 적는다(a/ 와 a/b/ 가 둘 다 비었으면 a/b 만) - 위 폴더는 경로로 따라 나온다.
     full = set()                     # 파일이 있거나 하위 폴더가 있는 폴더
@@ -286,5 +317,6 @@ def scan(root_abs, root_id, pc, user="", excluded=(), ignore=(), prev=None,
         "busy": busy,
         "errors": errors,
         "hashed_bytes": done[0],
+        "duplicates": duplicates,        # v01.55 [(건너뛴 경로, 먼저 센 경로)] - 같은 실제 폴더
     }
     return manifest, report

@@ -19,6 +19,8 @@ import os
 import time
 
 from Framework.core.file_opener import open_path
+from Framework.core.tree_scanner import junction_info
+from Framework.qt.MOD_fileTree_qt_v01 import JUNCTION_COLOR, _tinted_icon
 from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
 from Framework.qt.MOD_checkTree_qt_v01 import JUN_mod_checkTree_qt_v01
@@ -88,6 +90,7 @@ SUMMARY_PC_LIMIT = 4            # PC 가 이보다 많으면 요약 열(Latest o
 
 ROLE_REL = Qt.UserRole
 ROLE_KIND = Qt.UserRole + 1     # "file" | "dir" | "excluded"
+ROLE_JUNCTION = Qt.UserRole + 20     # v01.55 정션이면 가리키는 경로 (아니면 None)
 ROLE_EXCL_SCOPE = Qt.UserRole + 2   # "shared" | "local"
 ROLE_LOADED = Qt.UserRole + 4       # Excluded 트리: 폴더 자식을 읽었는가
 
@@ -296,6 +299,9 @@ class SyncTab(QWidget):
         self.tree_zoom = JUN_mod_viewZoom_qt_v01(self.tree, key="A00210_sync_tree")
         self._icon_dir = self.style().standardIcon(QStyle.SP_DirIcon)
         self._icon_file = self.style().standardIcon(QStyle.SP_FileIcon)
+        # v01.55 정션 = A00240 Tree 와 같은 연한 빨강 (아이콘 · 글자, 툴팁에 가리키는 경로)
+        self._icon_junction = _tinted_icon(self._icon_dir, JUNCTION_COLOR)
+        self._brush_junction = QBrush(QColor(JUNCTION_COLOR))
 
         self.lbl_summary = QLabel("")
         lay.addWidget(self.lbl_summary)
@@ -358,10 +364,13 @@ class SyncTab(QWidget):
         self.btn_rename_root.clicked.connect(self.on_rename_root)
         self.btn_remove_root = QPushButton("Remove")
         self.btn_remove_root.clicked.connect(self.on_remove_root)
-        self.chk_follow = QCheckBox("Follow junctions inside this root")
+        # v01.55 - 정션은 기본으로 따라 들어간다(C:/JUN 처럼 하위가 정션인 구조). 끄고 싶을 때만 체크.
+        self.chk_follow = QCheckBox("Skip junctions inside this root")
         self.chk_follow.setToolTip(
-            "Off (default): junctions / symlinked folders inside the root are skipped\n"
-            "(avoids loops and double tracking). The root itself may be a junction.")
+            "Off (default): junctions / symlinked folders inside the root are scanned like normal folders.\n"
+            "The same real folder is counted once even if two paths lead to it (no loops, no double tracking):\n"
+            "the shallower path wins, then by name - the same on every PC.\n"
+            "On: junctions inside the root are skipped. The root itself may always be a junction.")
         self.chk_follow.toggled.connect(self._on_follow_toggled)
         grid.addWidget(self.btn_add_root, 0, 0)
         grid.addWidget(self.btn_set_path, 0, 1)
@@ -475,6 +484,9 @@ class SyncTab(QWidget):
             if is_dir:
                 it.setChildIndicatorPolicy(QTreeWidgetItem.ShowIndicator)
                 it.setData(0, ROLE_LOADED, False)
+                is_j, target = junction_info(e.path)
+                if is_j:
+                    it.setData(0, ROLE_JUNCTION, target or "?")
             self._mark_excl_item(it)
             (parent.addChild(it) if parent is not None else self.excl_tree.addTopLevelItem(it))
 
@@ -504,9 +516,27 @@ class SyncTab(QWidget):
         if why:
             it.setForeground(0, QBrush(QColor(EXCLUDED_COLOR)))
             it.setToolTip(0, "{0}\n{1}".format(rel, why))
+        elif it.data(0, ROLE_JUNCTION):              # v01.55 정션 = 연한 빨강 (A00240 Tree 와 같다)
+            self._paint_junction(it, it.data(0, ROLE_JUNCTION), rel)
         else:
             it.setData(0, Qt.ForegroundRole, None)
             it.setToolTip(0, rel)
+
+    # ---------------------------------------------------------------- 정션 표시 (v01.55)
+
+    def _paint_if_junction(self, it, abs_path):
+        is_j, target = junction_info(abs_path)
+        if is_j:
+            self._paint_junction(it, target, it.data(0, ROLE_REL) or "")
+        return is_j
+
+    def _paint_junction(self, it, target, rel=""):
+        """정션 항목 - 아이콘 · 글자를 연한 빨강으로, 툴팁에 가리키는 경로 (A00240 Tree `_paint_junction` 과 같다)."""
+        it.setIcon(0, self._icon_junction)
+        it.setForeground(0, self._brush_junction)
+        it.setData(0, ROLE_JUNCTION, target or "?")
+        tip = "Junction -> {0}".format(target) if target and target != "?" else "Junction"
+        it.setToolTip(0, "{0}\n{1}".format(rel, tip) if rel else tip)
 
     def _excl_items(self):
         out = []
@@ -955,6 +985,7 @@ class SyncTab(QWidget):
         status_col = 1
         # 다시 그려도 사용자가 펼쳐 둔 폴더는 그대로(처음엔 전부 접힘). 필터 글자가 있으면 맞는 것까지 펼친다.
         keep = self._expanded_rels() if self._populated_once else set()
+        base = self._root_abs()                       # v01.55 정션 판별은 이 PC 의 실제 경로로
         self.tree.clear()
         self.tree.setColumnCount(len(headers))
         self.tree.setHeaderLabels(headers)
@@ -986,6 +1017,8 @@ class SyncTab(QWidget):
             it.setIcon(0, self._icon_dir)
             it.setData(0, ROLE_REL, path + "/")
             it.setData(0, ROLE_KIND, "dir")
+            if base:
+                self._paint_if_junction(it, os.path.join(base, *path.split("/")))
             (parent.addChild(it) if parent else self.tree.addTopLevelItem(it))
             folders[path.lower()] = it
             return it
@@ -1223,7 +1256,7 @@ class SyncTab(QWidget):
         prev = sm.load_manifest(sm.manifest_path(data_dir, root["id"], self._pc))
         kw = dict(root_abs=path, root_id=root["id"], pc=self._pc, user=self._get_author() or "",
                   excluded=self._excluded_for(root), ignore=self._settings.get("ignore_patterns") or [],
-                  prev=prev, follow_junctions=bool(root.get("follow_junctions")))
+                  prev=prev, follow_junctions=not bool(root.get("skip_junctions")))
         self._push_after_scan = push
         self._scan_root_id = root["id"]
         self._scan_started = time.time()
@@ -1266,6 +1299,11 @@ class SyncTab(QWidget):
             report["files"], report["hashed"], report["reused"], time.time() - self._scan_started, ui_path(path)))
         if report["busy"]:
             self._log("Sync: changed while scanning (kept previous state, scan again later): " + ", ".join(report["busy"][:10]))
+        dups = report.get("duplicates") or []
+        if dups:                                   # v01.55 같은 실제 폴더를 두 경로로 - 한 번만 셌다
+            self._log("Sync: {0} folder(s) reach a folder already scanned (junction) - counted once: {1}".format(
+                len(dups), ", ".join("{0} = {1}".format(a, b or "(root)") for a, b in dups[:5]) +
+                (" ..." if len(dups) > 5 else "")))
         for err in report["errors"][:10]:
             self._log("Sync: [WARN] " + err)
         if self._push_after_scan:
@@ -1520,7 +1558,7 @@ class SyncTab(QWidget):
                 break
         root = self._current_root()
         self.chk_follow.blockSignals(True)
-        self.chk_follow.setChecked(bool(root and root.get("follow_junctions")))
+        self.chk_follow.setChecked(bool(root and root.get("skip_junctions")))
         self.chk_follow.setEnabled(root is not None)
         self.chk_follow.blockSignals(False)
 
@@ -1630,9 +1668,9 @@ class SyncTab(QWidget):
         root = self._current_root()
         if not root:
             return
-        root["follow_junctions"] = bool(on)
+        root["skip_junctions"] = bool(on)
         if self._save_settings():
-            self._log("Sync: '{0}' follow junctions = {1} (applies from the next scan).".format(root["name"], bool(on)))
+            self._log("Sync: '{0}' skip junctions = {1} (applies from the next scan).".format(root["name"], bool(on)))
 
     # ============================================================== close
 

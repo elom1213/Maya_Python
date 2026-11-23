@@ -120,6 +120,14 @@ def _mark_junction(node, st):
     node["target"] = target
 
 
+def junction_info(path):
+    """(정션인가, 가리키는 경로) - 경로 하나만 물을 때 (2026-11-23, A00210 Sync 탭이 A00240 Tree 와 같은 판별을 쓰려고).
+    판별은 _mark_junction 과 같다: 리파스 태그 = IO_REPARSE_TAG_MOUNT_POINT."""
+    node = {"path": path}
+    _mark_junction(node, _lstat(path))
+    return bool(node.get("junction")), node.get("target", "")
+
+
 def _safe_is_dir(entry):
     try:
         return entry.is_dir()

@@ -58,5 +58,10 @@
 # 01.54  Maya > File Date: 새 하위탭 - 트리에서 체크한 .ma / .mb / .fbx 의 수정한 날짜만 바꾼다(내용 그대로, os.utime). 기본 오늘,
 #        시각은 각 파일 원래 시각 유지(기본) / 지정. 표에 지금 · 바뀔 날짜 미리보기, Undo Last. 코어 app/maya/core/file_dates.py.
 
-VERSION = "01.54"
-LAST_UPDATE = "2026-11-20"
+# 01.55  Sync: 루트 안 정션을 **기본으로 따라 들어간다**(C:/JUN 처럼 하위가 정션인 구조에서 정션 폴더 · 그 안 파일이 Status 에 안 나왔다 - 사용자).
+#        같은 실제 폴더(장치 + 파일 ID)는 한 번만 - 순환 정션 · 같은 대상 두 경로를 막고, 얕은 경로 · 이름 순이 이긴다(PC 마다 같은 경로).
+#        옵션은 반대로 `Skip junctions inside this root`(skip_junctions, 기본 끔) - 옛 follow_junctions 값은 읽지 않는다.
+#        정션 표시: Status · Excluded 트리의 정션 폴더를 A00240 Tree 와 같은 연한 빨강(아이콘 · 글자) + 'Junction -> 대상' 툴팁.
+
+VERSION = "01.55"
+LAST_UPDATE = "2026-11-23"

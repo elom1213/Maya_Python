@@ -151,9 +151,11 @@ try:
         link = os.path.join(root_b, "linked")
         subprocess.run(["cmd", "/c", "mklink", "/J", link, target], capture_output=True)
         if os.path.isdir(link):
+            # v01.55 기본이 바뀌었다: 루트 안 정션도 따라 들어간다 (C:/JUN 처럼 하위가 정션인 구조 - 사용자). Skip 을 켜면 예전처럼.
             mb, _ = sm.scan(root_b, "jun_mue", "PCB", excluded=excluded, ignore=ss.DEFAULT_IGNORE)
-            mbf, _ = sm.scan(root_b, "jun_mue", "PCB", excluded=excluded, ignore=ss.DEFAULT_IGNORE, follow_junctions=True)
-            check("junction inside root skipped by default", "linked/far.mb" not in mb["files"] and "linked/far.mb" in mbf["files"])
+            mbs, _ = sm.scan(root_b, "jun_mue", "PCB", excluded=excluded, ignore=ss.DEFAULT_IGNORE, follow_junctions=False)
+            check("junction inside root followed by default (v01.55), skipped with Skip junctions",
+                  "linked/far.mb" in mb["files"] and "linked/far.mb" not in mbs["files"])
             os.rmdir(link)       # 정션만 지운다(대상은 그대로)
             check("junction target intact", os.path.isfile(os.path.join(target, "far.mb")))
         else:

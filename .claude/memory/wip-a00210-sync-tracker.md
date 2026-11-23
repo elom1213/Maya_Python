@@ -29,3 +29,6 @@ metadata:
 - v01.51 (2026-11-06): 빈 폴더 — 스캔이 가장 안쪽 빈 폴더만 `empty_dirs` 에, `sc.empty_dirs` 가 DirStatus(present / lacking). 키 없는 옛 매니페스트 = 모름(Missing 아님).
   트리에서 빈 폴더 줄은 폴더 상태 계산 **전에** 만들어야 그 위 폴더 줄도 센다.
 - v01.52 (2026-11-06): Status `File Types` — 확장자 체크 메뉴(File Manager 와 같은 `CheckableMenu`, `app/ui/checkable_menu.py`), 끈 것 prefs `sync_types_off`. GUI 확인 아직.
+- v01.55 (2026-11-23): **루트 안 정션을 기본으로 따라 들어간다**(C:/JUN 스캔 때 정션 폴더 · 안 파일이 Status 에 안 나왔다 - 사용자). 옵션 = `skip_junctions`(기본 false), 옛 `follow_junctions` 는 읽지 않음(기본값 false 로 저장돼 있어서).
+  순환 · 중복 = 실제 폴더 `(st_dev, st_ino)`(os.stat 은 정션 대상을 따름) 기억, **너비 우선 + 이름 순**이라 얕은 경로가 이김(PC 마다 같은 rel). 보고 `duplicates`.
+  Status · Excluded 정션 = A00240 Tree 와 같은 연한 빨강(Framework `tree_scanner.junction_info` 추가, `JUNCTION_COLOR` · `_tinted_icon`). 시험은 실제 `mklink /J`. GUI 확인 아직.

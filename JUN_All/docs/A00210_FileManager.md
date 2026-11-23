@@ -676,7 +676,9 @@ Change only the modified date of the checked files - the contents stay as they a
   경로가 없는 PC 는 그 루트를 스캔하지 않는다.
 - 처음 열면 File Manager 의 **Project Root 를 첫 루트로 제안**한다(첫 스캔 · 편집 때 저장).
 - 한 루트가 다른 루트 안이면 추가할 때 안쪽을 바깥 루트의 제외 경로로 넣을지 묻는다(이중 추적 방지). 같은 경로는 거부.
-- 루트 **안의** 정션 · 심볼릭 링크 폴더는 기본으로 따라가지 않는다(`Follow junctions inside this root`). 루트 자체가 정션인 건 상관없다.
+- 루트 **안의** 정션 · 심볼릭 링크 폴더도 **기본으로 따라 들어간다**(v01.55 — `C:\JUN` 처럼 하위가 정션인 구조). 끄려면 `Skip junctions inside this root`.
+  같은 실제 폴더는 한 번만 센다 — 순환 정션 · 같은 대상을 가리키는 두 경로를 막고, **얕은 경로 · 이름 순**이 이긴다(PC 마다 같은 경로). 건너뛴 것은 스캔 로그에.
+  정션 폴더는 Status · Excluded 트리에서 **연한 빨강**(A00240 Tree 와 같다), 툴팁에 가리키는 경로.
 - `Rename` 은 이름만(폴더 id 는 그대로), `Remove` 는 추적만 멈춘다(파일 · 저장된 매니페스트는 그대로).
 
 ### Excluded — 제외 경로 · 무시 패턴

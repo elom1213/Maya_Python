@@ -11,7 +11,9 @@
 # _sync_settings.json
 #   {"schema": 1,
 #    "roots": [{"id": "jun_mue", "name": "JUN_MUE", "default_path": "C:/JUN/JUN_MUE",
-#               "excluded_paths": ["00_00_02_자료/", "x/y.mb"], "follow_junctions": false}],
+#               "excluded_paths": ["00_00_02_자료/", "x/y.mb"], "skip_junctions": false}],
+#   v01.55: follow_junctions(기본 false) → skip_junctions(기본 false) - 정션을 기본으로 따라 들어간다.
+#           옛 follow_junctions 값은 읽지 않는다(기본값 그대로 저장돼 있어 정션이 계속 안 보이게 된다).
 #    "ignore_patterns": ["**/backup/**", ...],
 #    "pc_names": {"P4T7MBN": "Office"}}      ← v01.50 PC 표시 이름(툴 안에서만). 매니페스트 파일 이름은 그대로 PC id.
 #
@@ -183,7 +185,7 @@ def new_root(name, default_path, existing_ids=()):
         "name": str(name or "").strip() or "Root",
         "default_path": str(default_path or "").replace("\\", "/"),
         "excluded_paths": [],
-        "follow_junctions": False,
+        "skip_junctions": False,
     }
 
 
@@ -245,7 +247,7 @@ def _clean(data):
                 "name": str(r.get("name") or rid),
                 "default_path": str(r.get("default_path") or "").replace("\\", "/"),
                 "excluded_paths": ex,
-                "follow_junctions": bool(r.get("follow_junctions", False)),
+                "skip_junctions": bool(r.get("skip_junctions", False)),
             })
         out["roots"] = roots
         if isinstance(data.get("ignore_patterns"), list):
