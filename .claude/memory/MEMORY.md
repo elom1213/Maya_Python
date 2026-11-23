@@ -30,7 +30,7 @@
 - [C:\JUN 정션 구조](project-c-jun-junction-layout.md) — PC 간 같은 논리 경로로 레퍼런스, 정션 경유 파일 아직 적음 → 이름 확정 적기, 확정 뒤엔 경로 불변
 - [Prefer PySide for new tools](prefer-pyside-for-new-tools.md) — 신규 툴은 PySide(arch B)
 - [No filename-dependent data](no-filename-dependent-data.md) — 파일 이름 규칙(예: `_f0105_0429`)에서 값을 읽어 데이터를 만들지 말 것, 이름은 출력 이름에만
-- [JUN_Memo repo](jun-memo-repo.md) — 스티커 메모 같은 독립 PySide6 앱, Maya_Python 바깥, 원격 origin main(GitHub 저장소 생성은 gh 로그인 대기)
+- [JUN_Memo repo](jun-memo-repo.md) — 스티커 메모 같은 독립 PySide6 앱, `D:\D__3010_JUN_Memo`, 원격 origin main(GitHub 저장소 생성은 gh 로그인 대기)
 - [JUN_JALI repo](jun-jali-repo.md) — VisemeNet 포크, 푸시는 origin main, `.venv` 추론 · angela_JALI 리그 적용
 - [kangaroo plugin read-only](kangaroo-plugin-external-readonly.md) · [PoseWrangler fork patch](posewrangler-plugin-fork-patch.md)
 
