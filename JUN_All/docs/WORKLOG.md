@@ -31,7 +31,15 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-20 (오늘)
+## 2026-11-23 (오늘)
+
+> [!summary] **`A00240_PathTool` v01.34 — Tree 탭 글자 확대 / 축소** `#A00240_PathTool`
+- 요청: Tree 탭에 글자 확대 기능 — A00110 View > Layers 의 것을 참고.
+- 공용 `MOD_viewZoom_qt_v01`(A00110 v02.38 에서 만든 것)을 Framework `fileTree` 에 `zoom_key` 옵션으로 붙이고(기본 끔 → A00210 · Junction 팝업 그대로) A00240 만 켰다.
+  Ctrl + 휠 · Filter 줄 `[-] 100% [+]`, 배율 기억, Expand 창도 같은 배율.
+- 시험 `Framework/tests/test_file_tree_zoom.py` 12 (PySide6 · PySide2). 체크 트리는 setCheckState 로는 기록 안 됨(확대와 무관) → 실제 클릭으로 시험.
+
+## 2026-11-20
 
 > [!summary] **`A00630_MotionPathEditor` v01.15 — Edit 묶음을 Speed 탭으로** `#A00630_MotionPathEditor`
 - 사용자 요청: Path 탭 Edit 묶음 전체를 Speed 탭 맨 아래로. Speed 탭 위쪽 Edit Path(v01.12)는 같은 탭 중복이라 숨김(동기화 코드 유지). 전체 497/497.

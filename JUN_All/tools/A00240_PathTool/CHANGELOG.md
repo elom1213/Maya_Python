@@ -2,6 +2,15 @@
 
 All notable changes to this tool are documented here.
 
+## [01.34] - 2026-11-23
+
+- **[UI] Tree 탭 글자 확대 / 축소.** `A00110_animTool_V02` View > Layers 와 같은 공용 기능(`Framework/qt/MOD_viewZoom_qt_v01`)을 붙였다.
+  - **Ctrl + 마우스 휠**(트리 위에서) 또는 Filter 줄 끝 **`[-] 100% [+]`**(퍼센트 글자 클릭 = 100%). 글자 · 행 높이 · 들여쓰기가 함께 커진다.
+  - 배율은 기억한다(QSettings `JUN/viewZoom` 의 `A00240_PathTool/tree`). **Expand 창도 같은 배율**로 열린다. 처음은 100%(지금 크기).
+  - Framework `JUN_mod_fileTree_qt_v01` 에 `zoom_key` · `zoom_default` 인자(기본 끔)를 더해 A00240 만 켰다 — 같은 위젯을 쓰는 A00210 Maya 탭 · Junction `Tree...` 팝업은 그대로.
+  - 시험 `Framework/tests/test_file_tree_zoom.py` 12항목(PySide6 · PySide2 모두): 끈 상태 그대로 · 버튼 자리 · 100% 시작 · 150% 에서 글자 · 행이 커짐 · Expand 같은 배율 · 기억 ·
+    200% 에서 체크박스 클릭(체크 트리와 함께) · A00240 이 켜 둠. 기존 viewZoom 32 · treeExpand 19 그대로. **GUI 확인 아직.**
+
 ## [01.33] - 2026-11-20
 
 - **[UI] Profile · Create · Color 를 하나로 접는다.** v01.32 는 셋을 따로 접었는데, 사용자 요청으로 접이식 섹션 하나

@@ -36,6 +36,7 @@ tree.checked_paths()  /  tree.set_checked_paths(paths, True)  /  tree.clear_chec
 | `checkable_files=True` | **파일 행에만** 체크박스. 폴더 · `...` 행에는 없다(기본 플래그의 `ItemIsUserCheckable` 을 벗긴다). Shift / Ctrl 로 여러 행을 고른 뒤 체크 하나로 전부 체크/해제 — 공용 [`JUN_mod_checkTree_qt_v01`](Framework_MOD_checkTree_qt.md) 동작 |
 | `checkable_folders=True` | **폴더 행(루트 포함)에 체크박스** (2026-10-13). 기억 · 신호 · 다중 체크 규칙은 `checkable_files` 와 같고, 둘을 함께 켤 수도 있다. 폴더만 켜면 파일 행엔 체크박스가 없다. `...` 생략 행은 늘 체크 없음. A00240 Junction 의 `Tree...` 폴더 고르기가 쓴다 |
 | `tree_hint_height=110` | 트리의 **sizeHint 높이**(px, 2026-11-03). Qt 기본 192px 은 창을 탭에 맞출 때([`tabFit`](Framework_MOD_tabFit_qt.md)) 그대로 처음 여는 트리 높이가 된다 — 짧게 열고 싶은 툴이 준다. 늘어나는 건 그대로. A00210 Maya 탭 = 110 |
+| `zoom_key="툴/트리"` | **글자 확대 / 축소** (2026-11-23) — 공용 [`viewZoom`](Framework_MOD_viewZoom_qt.md) 을 메인 트리와 Expand 창 트리에 붙이고 Filter 줄 끝에 `[-] 100% [+]`. 배율은 그 키로 기억. `zoom_default`(기본 1.0)가 처음 배율. `None`(기본) = 예전 그대로. A00240 Tree 탭 = `"A00240_PathTool/tree"` |
 | `default_types=(...)` | 처음 발견된 확장자 중 **File Types 에서 체크해 둘 것**(점 없는 소문자). 나머지는 메뉴에 보이되 꺼진다. `None` 이면 지금처럼 전부 체크 |
 
 ## 체크 상태는 경로로 기억한다
@@ -54,7 +55,7 @@ Maya File 리스트 · Reference 트리도 같은 헬퍼를 써서 문구 · 실
 
 ## 쓰는 곳
 
-- `A00240_PathTool` Tree 탭 (re-export, 옵션 없음)
+- `A00240_PathTool` Tree 탭 (re-export, v01.34 부터 `zoom_key="A00240_PathTool/tree"`)
 - `A00210_FileManager` Maya > Reference (`checkable_files=True, default_types=("ma","mb","fbx")`)
 - `A00240_PathTool` Junction > Create 의 `Tree...` 팝업 (`checkable_folders=True`) — 체크한 폴더를 Sources / Create In 에 담는다 (v01.23)
 

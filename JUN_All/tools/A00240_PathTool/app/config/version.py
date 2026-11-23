@@ -11,5 +11,8 @@
 # 01.33  Profile · Create · Color 를 따로 접지 않고 접이식 섹션 하나(`Option`)에 담아 함께 접는다.
 #        세 그룹은 원래 상자(QGroupBox) 모양 그대로. 상태 키 shortcut_settings_expanded (v01.32 의 키 3개는 안 읽음).
 
-VERSION = "01.33"
-LAST_UPDATE = "2026-11-20"
+# 01.34  Tree 탭 글자 확대 / 축소 - 공용 viewZoom(A00110 View > Layers 와 같은 것). Ctrl + 휠 또는 Filter 줄 끝 [-] 100% [+],
+#        글자 · 행 높이 · 들여쓰기가 함께 커지고 배율은 기억한다(Expand 창도 같은 배율). Framework fileTree 에 zoom_key 인자(기본 끔).
+
+VERSION = "01.34"
+LAST_UPDATE = "2026-11-23"

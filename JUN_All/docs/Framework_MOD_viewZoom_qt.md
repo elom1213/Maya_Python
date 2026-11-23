@@ -72,3 +72,4 @@ Ctrl + 휠 / 휠만, 버튼 줄, QSettings 기억, **창 qss 가 12px 를 박은
 | 툴 | 뷰 | 기본 |
 |----|----|------|
 | `A00110_animTool_V02` v02.38 | View > Layers 레이어 트리 | 150% |
+| `A00240_PathTool` v01.34 | Tree 탭 폴더 트리 (+ Expand 창) — Framework fileTree 의 `zoom_key` 로 | 100% |

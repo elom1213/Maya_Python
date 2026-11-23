@@ -154,7 +154,8 @@ class MainWindow(QWidget):
         self.tabs.addTab(self._wrap_page(self.shortcut_tab), "ShortCut")
 
         # Tree 탭: 입력 경로를 트리뷰로(깊이 제한·파일 토글·확장자 필터·Expand·우클릭 Reveal).
-        self.tree_tab = TreeTab()
+        # v01.34 : 글자 확대 / 축소 (공용 viewZoom - A00110 View > Layers 와 같은 것, 배율 기억)
+        self.tree_tab = TreeTab(zoom_key="A00240_PathTool/tree")
         self.tabs.addTab(self._wrap_page(self.tree_tab), "Tree")
 
         # Junction 탭 (v01.19): mklink /J 를 화면에서 - Create / Remove 하위 탭.

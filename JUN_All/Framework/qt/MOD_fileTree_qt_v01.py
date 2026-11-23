@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-23
 # Framework - 폴더 트리 공용 위젯 `JUN_mod_fileTree_qt_v01` (Qt)
 #
 # A00240_PathTool 의 "Tree" 탭(app/ui/tree_tab.py, v01.19) 을 **그대로** Framework 로 승격했다
@@ -39,6 +39,9 @@
 #   - 우클릭 메뉴 · 더블클릭은 공용 `Framework/qt/path_context.py` 로 (문구 · 실패 안내 동일).
 #   - checkable_folders=True (2026-10-13, A00240 v01.23 Junction "Tree..." 용) : **폴더 행(루트 포함)에 체크박스**.
 #     checkable_files 와 같은 기억·신호·다중 체크 규칙이고 둘을 함께 켤 수도 있다. `...` 생략 행은 체크 없음.
+#   - zoom_key="툴/트리" (2026-11-23, A00240 v01.34 요청) : **글자 확대 / 축소** - 공용 `JUN_mod_viewZoom_qt_v01`
+#     (A00110 View > Layers 와 같은 것). Ctrl + 휠 · Filter 줄 끝 `[-] 100% [+]`, 배율은 그 키로 기억. 메인 트리와
+#     Expand 창 트리 모두. 글자 · 행 높이 · 들여쓰기 · 체크박스가 함께 커진다. None(기본) = 예전 그대로.
 
 import os
 
@@ -75,6 +78,7 @@ from Framework.core import tree_scanner
 from Framework.core.prefetcher import Prefetcher
 from Framework.qt import path_context
 from Framework.qt.MOD_checkTree_qt_v01 import JUN_mod_checkTree_qt_v01
+from Framework.qt.MOD_viewZoom_qt_v01 import JUN_mod_viewZoom_qt_v01
 
 # 선읽기 (v01.17) - 폴더 하나를 펼쳤을 때 미리 읽을 하위 폴더 수의 상한.
 # 하위 폴더가 수만 개인 곳을 열어도 백그라운드가 그것만 붙들지 않게 한다(넘는 것은 펼칠 때 읽는다).
@@ -138,15 +142,22 @@ class JUN_mod_fileTree_qt_v01(QWidget):
                         (2026-10-13, A00240 Junction 의 "Tree..." 폴더 고르기용. `...` 생략 행은 없다.)
     default_types     : 처음 발견된 확장자 중 체크해 둘 것(점 없는 소문자 모음). None = 전부.
     tree_hint_height  : 트리의 sizeHint 높이(px). None = Qt 기본(192). 짧게 열고 싶은 툴이 준다 (2026-11-03, A00210 Maya 탭).
+    zoom_key          : 글자 확대 / 축소를 켜고 배율을 기억할 키(예: "A00240_PathTool/tree"). None = 끔 (2026-11-23).
+    zoom_default      : 처음 배율 (기본 1.0 = 지금 크기).
     """
 
     #: 체크 상태가 바뀌었다 - 지금 체크된 절대경로 목록 (checkable_files / checkable_folders 일 때만)
     checksChanged = Signal(list)
 
     def __init__(self, parent=None, checkable_files=False, default_types=None,
-                 checkable_folders=False, tree_hint_height=None):
+                 checkable_folders=False, tree_hint_height=None, zoom_key=None, zoom_default=1.0):
         super().__init__(parent)
         self._tree_hint_height = tree_hint_height
+        self._zoom_key = zoom_key
+        self._zoom_default = float(zoom_default)
+        self.zoom = None          # 메인 트리의 JUN_mod_viewZoom_qt_v01 (zoom_key 가 있을 때)
+        self._zooms = []          # 트리마다 붙인 viewZoom (Expand 창 포함, 참조 유지)
+        self.zoom_controls = None # Filter 줄의 [-] 100% [+]
 
         self.checkable_files = bool(checkable_files)
         self.checkable_folders = bool(checkable_folders)
@@ -194,6 +205,10 @@ class JUN_mod_fileTree_qt_v01(QWidget):
         if self._tree_hint_height:
             self.tree._hint_height = self._tree_hint_height
         root.addWidget(self.tree, stretch=1)
+        if self._zooms:
+            self.zoom = self._zooms[0]
+            self.zoom_controls = self.zoom.controls()
+            self._flt_row.addWidget(self.zoom_controls)        # Filter 줄 끝 [-] 100% [+]
 
     def _build_controls(self):
         group = QGroupBox("Path Tree")
@@ -335,6 +350,7 @@ class JUN_mod_fileTree_qt_v01(QWidget):
 
         self.lbl_filter_count = QLabel("")
         flt_row.addWidget(self.lbl_filter_count)
+        self._flt_row = flt_row                 # 확대 / 축소 버튼 자리 (2026-11-23)
 
         layout.addLayout(flt_row)
         return group
@@ -359,6 +375,10 @@ class JUN_mod_fileTree_qt_v01(QWidget):
             behavior = JUN_mod_checkTree_qt_v01(tree)
             behavior.checksChanged.connect(self._on_items_checked)
             self._check_behaviors.append(behavior)
+        if self._zoom_key:
+            # 글자 확대 / 축소 (2026-11-23) - 메인 · Expand 창이 같은 키라 Expand 창도 지금 배율로 열린다
+            self._zooms.append(JUN_mod_viewZoom_qt_v01(tree, key=self._zoom_key, default=self._zoom_default))
+            tip += "\nCtrl + Mouse Wheel: bigger / smaller text."
         tree.setToolTip(tip)
         # Shift 를 누른 채 펼치면/접으면 그 아래 전부에 같은 것을 적용한다.
         tree.itemExpanded.connect(self._on_item_expanded)

@@ -252,6 +252,10 @@ Path 버튼을 **누른 채 끌어서 놓으면** 그 자리로 간다 — 마�
 > **v01.20** — 이 탭의 본체는 Framework 공용 위젯 `JUN_mod_fileTree_qt_v01`
 > (`Framework/qt/MOD_fileTree_qt_v01.py`) 로 올라갔다. `A00480_FileTool` 의 Maya 탭이 같은 트리로
 > 마야 파일을 고른다. 이 툴에서의 동작은 그대로다. 위젯 안내는 [`Framework_MOD_fileTree_qt.md`](Framework_MOD_fileTree_qt.md).
+>
+> **v01.34 — 글자 확대 / 축소**: 트리 위에서 **Ctrl + 마우스 휠**, 또는 Filter 줄 끝 **`[-] 100% [+]`**(퍼센트 글자 클릭 = 100%).
+> 글자 · 행 높이 · 들여쓰기가 함께 커지고 배율은 기억한다. Expand 창도 같은 배율로 열린다.
+> A00110 View > Layers 와 같은 공용 기능 — [`Framework_MOD_viewZoom_qt.md`](Framework_MOD_viewZoom_qt.md).
 
 ```
 ┌ Path Tree ────────────────────────────────────────────┐

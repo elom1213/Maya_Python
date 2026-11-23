@@ -18,4 +18,7 @@ metadata:
 - 시험 `Framework/tests/test_view_zoom.py` PySide6 · PySide2 32/32. 문서 `docs/Framework_MOD_viewZoom_qt.md`.
 
 **Why:** 사용자가 Layers 행 · 체크박스가 작다며 "툴마다 공유 가능한 확대 / 축소 공용 기능" 을 요청.
+- 쓰는 곳: A00110 v02.38 Layers(150%) · **A00240 v01.34 Tree 탭(100%, 2026-11-23)** — Framework `fileTree` 에 `zoom_key` 인자로(기본 끔, 메인 + Expand 창 트리, Filter 줄에 controls).
+- 시험 함정: `checkTree` 체크 기록은 **사용자 클릭만** 받는다 — `setCheckState` 를 코드로 부르면 확대와 무관하게 `checked_paths()` 가 비어 있다 → 시험은 QTest 클릭으로.
+
 **How to apply:** 다른 툴에서 리스트가 작다는 요청이 오면 행 높이를 박지 말고 이 위젯을 붙인다. 커스텀 델리게이트 쓰는 뷰엔 못 붙인다. [[offscreen-size-needs-theme]]
