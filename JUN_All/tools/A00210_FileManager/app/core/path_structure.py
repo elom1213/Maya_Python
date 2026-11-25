@@ -230,6 +230,24 @@ def _collect_files(base_abs, max_depth, include_top=None):
     return sorted(out)
 
 
+def prune_excluded(rels, excluded):
+    """rels 에서 excluded 에 든 경로와 **그 하위 경로 전부**를 뺀다(순서 유지). v01.59
+
+    체크 해제한 폴더는 그 아래가 체크돼 있어도 만들지 않는다 - `a` 를 빼면 `a/b`, `a/b/c.ma` 도 빠진다.
+    비교는 POSIX 상대경로 그대로(`a` 가 `ab` 를 빼지는 않는다).
+    """
+    blocked = {e.strip("/") for e in (excluded or []) if e and e.strip("/")}
+    if not blocked:
+        return list(rels)
+    out = []
+    for rel in rels:
+        parts = rel.strip("/").split("/")
+        if any("/".join(parts[:n]) in blocked for n in range(1, len(parts) + 1)):
+            continue
+        out.append(rel)
+    return out
+
+
 def limit_depth(folders, max_depth):
     """폴더/파일 상대경로 목록에서 base 기준 깊이가 max_depth 이하인 것만 반환.
 

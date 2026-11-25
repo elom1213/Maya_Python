@@ -72,5 +72,9 @@
 
 # 01.58  Sync > Status 에도 `Scan depth` 칸 - Roots 의 칸과 같은 설정(루트의 공유 scan_depth), 한쪽을 바꾸면 다른 쪽도 바로.
 
-VERSION = "01.58"
-LAST_UPDATE = "2026-11-23"
+# 01.59  Path Structure - 체크 해제한 폴더는 그 **하위 경로 전부**도 Recreate 하지 않는다(아래가 체크돼 있어도).
+#        예전엔 해제한 경로 자신만 빠져서 하위가 체크돼 있으면 부모째 다시 생겼다(사용자 보고).
+#        core.path_structure.prune_excluded, 미리보기는 막힌 하위를 회색 + 툴팁(체크 상태는 유지 - 상위를 켜면 복귀).
+
+VERSION = "01.59"
+LAST_UPDATE = "2026-11-25"

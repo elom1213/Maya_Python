@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-25 (오늘)
 
+> [!summary] **`A00210_FileManager` v01.59 — Path Structure : 체크 해제한 폴더는 하위까지 만들지 않음** `#A00210_FileManager`
+- 사용자 보고: 상위 경로를 체크 해제해도 하위가 체크돼 있으면 하위(와 상위)가 생성된다. 원인 = Recreate 가 해제한 경로 **자신만** 빼서
+  남은 `a/b` 를 makedirs 가 부모째 만들었다(문서에도 "상위 폴더는 자동 생성" 으로 적혀 있던 동작).
+- core `prune_excluded` — 해제한 경로와 그 하위 전부를 폴더 · 파일 목록에서 뺀다. 미리보기는 막힌 하위를 회색 + 툴팁, 체크는 유지(상위를 켜면 복귀).
+- 시험 `test_path_structure_prune.py` 11 (신규, 실제 Recreate 결과 폴더로 확인), `test_ui_paths.py` 28 그대로.
+
 > [!summary] **`A00480_FileTool` v01.22 — Reference > Default `Import`** `#A00480_FileTool`
 - 요청: Reference > Default 에 레퍼런스를 임포트하는 기능. `Import` 버튼 + 우클릭 `Import Objects from Reference` + `Include nested` 체크.
 - mayapy 실측: 중첩 레퍼런스는 혼자 임포트 불가(부모 먼저 → 최상위로 올라온 뒤 가능) · 언로드는 임포트 에러(먼저 로드) · undo 안 됨(확인 창) ·

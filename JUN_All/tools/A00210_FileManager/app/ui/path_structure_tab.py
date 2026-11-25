@@ -547,6 +547,34 @@ class PathStructureTab(QWidget):
             tree.addTopLevelItem(root_item)
             tree.expandAll()
         tree.blockSignals(False)
+        self._sync_blocked(tree)
+
+    _BLOCKED_TIP = "Not created - a parent folder above it is unchecked."
+
+    def _sync_blocked(self, tree):
+        """상위 폴더가 체크 해제된 항목을 회색 + 툴팁으로 (v01.59). 체크 상태는 그대로 둔다 -
+        상위를 다시 켜면 원래대로 만들어진다. Recreate 의 prune_excluded 와 같은 규칙."""
+        if tree is None:
+            return
+        tree.blockSignals(True)
+
+        def walk(parent, blocked):
+            for i in range(parent.childCount()):
+                child = parent.child(i)
+                if self._is_checkable(child):
+                    if blocked:
+                        child.setForeground(0, self._brush_unrecorded)
+                        child.setToolTip(0, self._BLOCKED_TIP)
+                    elif child.toolTip(0) == self._BLOCKED_TIP:
+                        child.setData(0, Qt.ForegroundRole, None)
+                        child.setToolTip(0, "")
+                    off = child.checkState(0) != Qt.Checked
+                else:
+                    off = False
+                walk(child, blocked or off)
+
+        walk(tree.invisibleRootItem(), False)
+        tree.blockSignals(False)
 
     def _make_preview_item(self, node):
         """트리 노드(dict) → QTreeWidgetItem.
@@ -623,6 +651,7 @@ class PathStructureTab(QWidget):
         tree = item.treeWidget()
         if tree is None:
             return
+        self._sync_blocked(tree)
 
         # 토글한 항목이 다중 선택에 포함돼 있으면 선택된 폴더 전체를 같은 상태로 맞춘다.
         # 키보드(스페이스) 토글이면 selectedItems() 가 온전하고, 마우스 클릭이면 이미 한 행으로
@@ -661,6 +690,7 @@ class PathStructureTab(QWidget):
         walk(tree.invisibleRootItem())
         tree.blockSignals(False)
         self._syncing_checks = False
+        self._sync_blocked(tree)
 
     def _restore_selection(self, tree, rels):
         relset = {r for r in rels if r}
@@ -729,13 +759,13 @@ class PathStructureTab(QWidget):
         # 현재 Preview 옵션(Depth 제한 + 체크 해제한 항목 제외)만 생성한다.
         # 트리에 보이는 것 = 만들어지는 것. 'Create files' 를 끄면 파일은 트리에도 없고
         # 만들어지지도 않는다(Depth 규칙과 동일).
+        # v01.59 - 체크 해제한 폴더의 **하위 전부**도 뺀다(아래가 체크돼 있어도). 예전엔 그 경로 자신만 빠져서
+        # 하위가 체크돼 있으면 makedirs 가 부모까지 다시 만들었다.
         depth = self._view_depth()
-        folders = [f for f in ps_mod.limit_depth(structure.folders, depth)
-                   if f not in self._excluded]
+        folders = ps_mod.prune_excluded(ps_mod.limit_depth(structure.folders, depth), self._excluded)
         files = []
         if self.chk_create_files.isChecked():
-            files = [f for f in ps_mod.limit_depth(structure.files, depth)
-                     if f not in self._excluded]
+            files = ps_mod.prune_excluded(ps_mod.limit_depth(structure.files, depth), self._excluded)
 
         # 목적지가 아직 없으면 새로 만들 것임을 알린다(오타로 엉뚱한 곳에 생성 방지).
         if not os.path.isdir(target):
