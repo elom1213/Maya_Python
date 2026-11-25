@@ -36,7 +36,7 @@
 
 ## 검증 · 창 크기
 
-- [Bash heredoc collapses backslashes](bash-heredoc-backslash-collapse.md) — `python - <<'EOF'` 안 `\n` 이 줄바꿈이 됨, `\` 들어간 패치는 Write 로 스크립트 파일
+- [Bash heredoc collapses backslashes](bash-heredoc-backslash-collapse.md) — `python - <<'EOF'` 안 백슬래시 두 개가 하나로 줄어듦(문자열에 진짜 줄바꿈), 백슬래시 들어간 패치는 Write 로 스크립트 파일
 - [mayapy headless verify](mayapy-headless-verify.md) — maya.cmds 동작은 mayapy + standalone 으로 실측
 - [offscreen size needs theme](offscreen-size-needs-theme.md) — 테마 입히고 재라, 오프스크린 px > 마야 px (잰 값을 박지 말 것)
 - [tabFit: 탭마다 창 높이 자동](framework-tabfit-widget.md) — `JUN_mod_tabFit_qt_v01(window, tabs)` 한 줄, **★ PySide6 enum…
