@@ -12,7 +12,9 @@
     { "tool": "A00220_BackupTool", "enabled": true },
     { "tool": "A00240_PathTool", "enabled": true },
     // JUN_Memo (스티커 메모) - 별도 저장소라 경로로. 이 경로가 없는 PC 에서는 missing 으로 건너뛴다
-    { "launch": "D:\\D__3010_JUN_Memo\\launch.py", "enabled": true }
+    { "launch": "D:\\D__3010_JUN_Memo\\launch.py", "enabled": true },
+    // JUN_DeathCalendar (죽음 캘린더) - 별도 저장소라 경로로. 없는 PC 에서는 missing 으로 건너뛴다
+    { "launch": "D:\\D__3020_JUN_DeathCalendar\\launch.py", "enabled": true }
     // 새 툴 추가는 여기에 한 줄: { "tool": "A002NN_XXX", "enabled": true }
     // 또는 커스텀 경로: { "launch": "%USERPROFILE%\\tools\\my\\launch.py", "enabled": true }
   ]
