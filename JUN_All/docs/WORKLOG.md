@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-25 (오늘)
 
+> [!summary] **`A00480_FileTool` v01.22 — Reference > Default `Import`** `#A00480_FileTool`
+- 요청: Reference > Default 에 레퍼런스를 임포트하는 기능. `Import` 버튼 + 우클릭 `Import Objects from Reference` + `Include nested` 체크.
+- mayapy 실측: 중첩 레퍼런스는 혼자 임포트 불가(부모 먼저 → 최상위로 올라온 뒤 가능) · 언로드는 임포트 에러(먼저 로드) · undo 안 됨(확인 창) ·
+  `file(referenceNode=rn, importReference=True)` 로 복사 번호 무관 · 씬 쪽 컨스트레인트 유지.
+- 부모 먼저 처리, 부모 없이 고른 중첩은 건너뛰고 안내, Missing 건너뜀, Include nested 는 아래로 전부.
+- 시험 `test_reference_import.py` 20 (신규), `test_reference.py` 47(메뉴 · 버튼 기대값 갱신) · replace 20 · lineage 44 그대로.
+
 > [!summary] **`A00275_skinTool_V01` v01.48 — Flood 리스트 계층 표시 + `Select in List`** `#A00275_skinTool_V01`
 - 요청 1: Get Bound Joints 로 담은 뒤 씬에서 고른 조인트를 버튼 하나로 TSL 에서 선택 → 이어서 Flood 하기 쉽게.
   `Select in List` 추가, Flood 는 리스트에서 고른 행이 있으면 그 조인트만(없으면 전부). 같은 이름은 풀패스(UUID)로 구별.

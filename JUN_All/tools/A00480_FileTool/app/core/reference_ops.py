@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-06
+# last Update date : 2026-11-25
 # A00480_FileTool - Reference 탭 로직 (maya.cmds, UI 비의존)
 """
 reference_ops - 현재 씬의 레퍼런스(중첩 포함)를 모으고, 파일을 탐색기로 열고, 경로 문자열을 만든다.
@@ -359,4 +359,142 @@ def replace_references(nodes, new_path):
         logs.append("[WARN] {0} nested reference(s) replaced - this is temporary and is NOT saved with the scene. "
                     "Open the parent file and replace it there to make it permanent.".format(nested))
     logs.append("Replace done : {0} reference(s) -> {1}".format(count, os.path.normpath(path)))
+    return count, logs
+
+
+# ==========================================================================
+# Import (v01.22)
+# ==========================================================================
+# mayapy 2024 실측 (2026-11-25):
+# - `file(referenceNode=rn, importReference=True)` = Reference Editor 의 Import Objects from Reference. 노드로 지정하므로
+#   같은 파일의 복사 번호(`{1}`)와 무관하다. 레퍼런스 노드는 사라지고 노드는 씬 것이 된다(네임스페이스는 그대로),
+#   씬 쪽 연결(컨스트레인트 · 키)도 그대로.
+# - **중첩 레퍼런스는 혼자 임포트할 수 없다** ("its parent file is not the top-level scene file").
+#   부모를 임포트하면 그 중첩이 **최상위 레퍼런스로 올라오고**(노드 이름 그대로) 그때부터 임포트된다.
+# - **언로드 레퍼런스는 임포트 에러** ("it is unloaded") -> 먼저 `file(loadReference=rn)`.
+# - **undo 안 된다** -> UI 가 실행 전에 확인을 받는다.
+
+
+def _ref_nodes(cmds):
+    return [n for n in (cmds.ls(type="reference") or []) if n not in SKIP_NODES and _query(cmds, n, filename=True)]
+
+
+def _descendants(cmds, node):
+    """지금 씬에 있는 node 아래 중첩 레퍼런스 노드 전부(깊이 우선, 부모 먼저)."""
+    out = []
+    kids = {}
+    for n in _ref_nodes(cmds):
+        kids.setdefault(_query(cmds, n, referenceNode=True, parent=True), []).append(n)
+
+    def walk(parent):
+        for child in sorted(kids.get(parent, [])):
+            out.append(child)
+            walk(child)
+
+    walk(node)
+    return out
+
+
+def import_plan(nodes):
+    """임포트할 노드를 **트리 순서(부모 먼저)** 로 정리한다. 반환 (targets, skipped_logs).
+
+    - 씬에 없는 노드 · 레퍼런스가 아닌 노드 · 파일이 없는(Missing) 레퍼런스는 뺀다.
+    - 중첩 레퍼런스는 **조상 레퍼런스가 전부 함께 골라졌을 때만** 된다(부모가 먼저 임포트돼 최상위로 올라오므로).
+      부모를 안 고른 중첩은 마야가 막으므로 빼고 알린다.
+    """
+    cmds = _cmds()
+    if cmds is None:
+        return [], ["[WARN] maya.cmds is not available - no scene to change."]
+    picked = []
+    for node in nodes or []:
+        if node and node not in picked:
+            picked.append(node)
+    logs = []
+    valid = []
+    for node in picked:
+        if not cmds.objExists(node) or cmds.nodeType(node) != "reference" or node in SKIP_NODES:
+            logs.append("[WARN] Not a reference node in the scene - skipped : {0}".format(node))
+            continue
+        path = _query(cmds, node, filename=True, withoutCopyNumber=True) or ""
+        if not path or not os.path.isfile(path):
+            logs.append("[WARN] File is missing - cannot import : {0} ({1})".format(
+                node, os.path.normpath(path) if path else "no file"))
+            continue
+        valid.append(node)
+    chosen = set(valid)
+    depth_of = {}
+    targets = []
+    for node in valid:
+        chain = []
+        parent = _query(cmds, node, referenceNode=True, parent=True)
+        while parent:
+            chain.append(parent)
+            parent = _query(cmds, parent, referenceNode=True, parent=True)
+        missing = [p for p in chain if p not in chosen]
+        if missing:
+            logs.append("[WARN] {0} is inside {1} - a nested reference can only be imported after its parent. "
+                        "Select the parent too (or use Include nested on the parent) - skipped.".format(
+                            node, missing[0]))
+            continue
+        depth_of[node] = len(chain)
+        targets.append(node)
+    # 부모 먼저 (같은 깊이는 고른 순서)
+    targets.sort(key=lambda n: depth_of[n])
+    return targets, logs
+
+
+def import_references(nodes, include_nested=False):
+    """고른 레퍼런스를 씬으로 임포트한다(Reference Editor 의 Import Objects from Reference). 반환 (count, logs).
+
+    - 부모부터 임포트한다 - 그 안의 중첩은 최상위 레퍼런스로 남는다(마야 동작).
+      `include_nested=True` 면 그 중첩까지 아래로 전부 임포트한다(언로드였던 중첩도 로드해서).
+    - 언로드 레퍼런스는 로드한 뒤 임포트한다. 네임스페이스는 그대로 둔다(Reference Editor 와 같다).
+    - undo 는 안 된다(호출 전에 확인 받을 것).
+    """
+    cmds = _cmds()
+    if cmds is None:
+        return 0, ["[WARN] maya.cmds is not available - no scene to change."]
+    targets, logs = import_plan(nodes)
+    if not targets:
+        return 0, logs or ["[WARN] No reference selected."]
+
+    queue = list(targets)
+    done = set()
+    count = 0
+    left_nested = 0
+    while queue:
+        node = queue.pop(0)
+        if node in done or not cmds.objExists(node):
+            continue
+        done.add(node)
+        path = _query(cmds, node, filename=True, withoutCopyNumber=True) or ""
+        if not path or not os.path.isfile(path):
+            logs.append("[WARN] File is missing - cannot import : {0}".format(node))
+            continue
+        loaded_now = False
+        try:
+            if not _query(cmds, node, isLoaded=True):
+                cmds.file(loadReference=node)
+                loaded_now = True
+            nested = _descendants(cmds, node)
+            children = [n for n in nested if _query(cmds, n, referenceNode=True, parent=True) == node]
+            cmds.file(referenceNode=node, importReference=True)
+        except Exception as exc:                            # noqa: BLE001
+            logs.append("[ERROR] Could not import {0} : {1}".format(node, exc))
+            continue
+        count += 1
+        line = "Imported {0} : {1}".format(node, os.path.basename(path))
+        if loaded_now:
+            line += " (loaded first)"
+        logs.append(line)
+        # 임포트 뒤 자식 중첩은 최상위 레퍼런스가 된다 -> 다음 차례로(부모 먼저 유지: 바로 앞에 끼운다)
+        pending = [c for c in children if c not in done and cmds.objExists(c)]
+        if include_nested:
+            queue[0:0] = pending
+        else:
+            left_nested += len([c for c in pending if c not in queue])
+    if left_nested:
+        logs.append("[Info] {0} nested reference(s) are now top-level references in the scene "
+                    "(turn on Include nested to import them too).".format(left_nested))
+    logs.append("Import done : {0} reference(s) imported.".format(count))
     return count, logs

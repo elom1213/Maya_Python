@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-06
+# last Update date : 2026-11-25
 # A00480_FileTool - Reference 탭 (in-Maya)
 #
 # 하위 탭 `Default` : 현재 씬의 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로 보여 주고,
@@ -15,6 +15,8 @@
 # `Replace...`(v01.21) : 고른 레퍼런스를 다른 .ma / .mb 로 교체(Reference Editor 의 Replace Reference). 파일 고르기 →
 # 확인(undo 안 됨 · 중첩은 저장 안 됨 안내) → core.reference_ops.replace_references → 트리 다시 읽기.
 # 파일 창 / 확인 창은 `_ask_file` / `_confirm` 메서드 - 시험에서 바꿔 끼운다.
+# `Import`(v01.22) : 고른 레퍼런스를 씬으로 임포트(Reference Editor 의 Import Objects from Reference). 확인(undo 안 됨) →
+# core.reference_ops.import_references → 트리 다시 읽기. `Include nested` 를 켜면 그 안의 중첩까지 전부.
 
 import os
 
@@ -27,6 +29,7 @@ from Framework.qt.qt import (
     QLabel,
     QPushButton,
     QComboBox,
+    QCheckBox,
     QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
@@ -141,6 +144,27 @@ class ReferenceDefaultPage(QWidget):
             button.clicked.connect(handler)
             self.buttons[label] = button
             row.addWidget(button)
+        layout.addLayout(row)
+
+        # v01.22 - 임포트 줄 : 버튼 + 중첩까지 옵션
+        row = QHBoxLayout()
+        self.import_button = QPushButton("Import")
+        self.import_button.setToolTip(
+            "Import the selected references into the scene - the same as Reference Editor >\n"
+            "Import Objects from Reference. The objects become part of this scene (no longer\n"
+            "referenced); namespaces and the scene's connections (constraints, keys) stay.\n"
+            "Unloaded references are loaded first. Missing files are skipped.\n"
+            "A nested reference can only be imported together with its parent.\n"
+            "Cannot be undone.")
+        self.import_button.clicked.connect(self.on_import)
+        self.buttons["Import"] = self.import_button
+        row.addWidget(self.import_button, stretch=1)
+        self.nested_check = QCheckBox("Include nested")
+        self.nested_check.setToolTip(
+            "On : also import every reference inside the selected ones, all the way down.\n"
+            "Off : only the selected ones - the references inside them stay as\n"
+            "top-level references of the scene (Maya's default).")
+        row.addWidget(self.nested_check)
         layout.addLayout(row)
 
     # ------------------------------------------------------------------ fill
@@ -294,14 +318,41 @@ class ReferenceDefaultPage(QWidget):
         self.refresh()
         return True
 
+    def on_import(self, *_args):
+        """고른 레퍼런스를 씬으로 임포트 (v01.22). 확인 -> 임포트 -> 다시 읽기."""
+        nodes = self.selected_nodes()
+        if not nodes:
+            self._log_all(["[WARN] No reference selected."])
+            return False
+        targets, plan_logs = ops.import_plan(nodes)
+        if not targets:
+            self._log_all(plan_logs or ["[WARN] No reference selected."])
+            return False
+        include_nested = self.nested_check.isChecked()
+        text = "Import {0} reference(s) into the scene?\n\n{1}".format(
+            len(targets),
+            "\n".join("  " + n for n in targets[:10]) + ("\n  ..." if len(targets) > 10 else ""))
+        if include_nested:
+            text += "\n\nReferences inside them are imported too (Include nested)."
+        else:
+            text += "\n\nReferences inside them stay as top-level references."
+        text += "\n\nThis cannot be undone."
+        if not self._confirm(text, title="Import Reference"):
+            self._log_all(["[Info] Import cancelled."])
+            return False
+        _count, logs = ops.import_references(targets, include_nested=include_nested)
+        self._log_all(plan_logs + logs)
+        self.refresh()
+        return True
+
     def _ask_file(self, start):
         """교체할 파일 고르기 창. 시험에서 바꿔 끼운다."""
         path, _filter = QFileDialog.getOpenFileName(self, "Replace Reference With", start, ops.REPLACE_FILTER)
         return path
 
-    def _confirm(self, text):
+    def _confirm(self, text, title="Replace Reference"):
         """실행 확인 창(undo 안 됨). 시험에서 바꿔 끼운다."""
-        answer = QMessageBox.question(self, "Replace Reference", text,
+        answer = QMessageBox.question(self, title, text,
                                       QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         return answer == QMessageBox.Yes
 
@@ -326,6 +377,9 @@ class ReferenceDefaultPage(QWidget):
         act = menu.addAction("Replace Reference..." + (" ({0})".format(len(nodes)) if len(nodes) > 1 else ""))
         act.setEnabled(bool(nodes))
         handlers[act] = self.on_replace
+        act = menu.addAction("Import Objects from Reference" + (" ({0})".format(len(nodes)) if len(nodes) > 1 else ""))
+        act.setEnabled(bool(nodes))
+        handlers[act] = self.on_import
         menu.addSeparator()
         handlers[menu.addAction("Refresh")] = self.refresh
         return menu, handlers
@@ -363,7 +417,8 @@ class ReferenceTab(QWidget):
         self.default_page = ReferenceDefaultPage(log=self._log_callback)
         self.tabs.addTab(self.default_page, "Default")
         self.tabs.setTabToolTip(0, "List the references of the current scene (nested included), "
-                                   "open them in File Explorer, copy their paths, replace them with another file. The File column "
+                                   "open them in File Explorer, copy their paths, replace them with another file, import them "
+                                   "into the scene. The File column "
                                    "can show the full path or just the file name.")
         self.lineage_page = ReferenceLineagePage(log=self._log_callback)
         index = self.tabs.addTab(self.lineage_page, "Lineage")

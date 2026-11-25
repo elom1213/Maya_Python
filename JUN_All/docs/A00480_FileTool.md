@@ -18,7 +18,7 @@ Maya 안에서 도는 **파일 입출력 · 경로** PySide 툴이다(arch B, in
 | **Path** | `Copy Scene Folder` · `Open Scene Folder` | [`A00030_quickTool_V02`](A00030_quickTool_V02.md) `File` |
 | **Reference > Default** (v01.12) | 현재 씬의 레퍼런스를 **중첩(이중 · 삼중)까지 트리**로 → 고른 파일을 탐색기에서 열기 · 경로 복사 | 신규 (§5) |
 
-- **버전**: `app/config/version.py` (v01.13 — Import > FBX 에 **`Mocap FBX Import (Exact Rotation)`**: 마야 FBX 임포터가 비 XYZ 회전 순서 조인트의 회전 키를 뒤집는 문제를 FBX 원본 키로 고침 · `Fix Scene From FBX`(§3-2) · v01.12 — **`Reference` 탭**(하위 탭 `Default`): 씬 레퍼런스를 중첩까지 트리로, `Open in Explorer` · `Copy Path`(§5) · v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
+- **버전**: `app/config/version.py` (v01.22 — Reference > Default 에 **`Import`**: 고른 레퍼런스를 씬으로 임포트, `Include nested` 로 중첩까지(§5) · v01.13 — Import > FBX 에 **`Mocap FBX Import (Exact Rotation)`**: 마야 FBX 임포터가 비 XYZ 회전 순서 조인트의 회전 키를 뒤집는 문제를 FBX 원본 키로 고침 · `Fix Scene From FBX`(§3-2) · v01.12 — **`Reference` 탭**(하위 탭 `Default`): 씬 레퍼런스를 중첩까지 트리로, `Open in Explorer` · `Copy Path`(§5) · v01.11 — Import > CSV 에 **`Value Scale`**: CSV 값 x 배율로 키(AdvancedSkeleton 페이셜 컨트롤 = `x10`, §3-1) · v01.10 — Import 탭이 하위 탭 **CSV / FBX**, CSV = `A00200_CSV_tool` 이식(영어 UI, 아무 노드에 키, §3-1) · v01.09 — Naming 토큰 규칙에 **`Enum`**(정해진 값 중 고르기, A00330 과 같은 공용 규칙, §2-4) · v01.08 — Naming 칸을 고쳐도 저장 안 함, **`Save` 버튼**으로만 프로파일 기본이 된다(§2-4) · v01.07 — 창이 화면보다 커서 **로그창이 두 개처럼** 보이던 문제 수정(탭 스크롤 + 화면 높이에 맞춤) · v01.06 — **Naming 을 A00330 Token 과 같은 토큰 칸 + Profile** 로(§2-4) · v01.05 — 걸린 메시를 **마야에서 선택** · v01.04 — `Check Hide Mesh` 는 **메시 자신만** 본다 · v01.03 — Export **규칙**: 내보내기 전 검사, 첫 규칙 `Check Hide Mesh` · v01.02 — Pin 글자 잘림 수정)
 - **설치**: `__dragDrop_A00480.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **FileTool** → `tools.A00480_FileTool.run(True)`
 - **테마**: `slate_dark`
 - **원본 두 툴은 그대로 남아 있다.** quickTool 의 File · Import option 버튼도 지워지지 않았다.
@@ -331,6 +331,7 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
 │ │   LEAF_TOP{2}    D:\...\leaf.ma                 Unloaded   │  (회색 — 안의 중첩은 로드돼야 보인다)
 │ │   GONE{3}        D:\...\gone.ma                 Missing    │  (빨강 — 파일이 디스크에 없다)
 │ │ [ Open in Explorer ]   [ Copy Path ]   [ Replace... ]     │
+│ │ [            Import            ]  [ ] Include nested       │
 └─┴───────────────────────────────────────────────────────────┘
 ```
 
@@ -357,6 +358,16 @@ FBX 임포트가 **파일에 저장된 노멀을 그대로** 쓰게 한다(`Over
   - 부모와 그 안의 중첩 레퍼런스를 같이 고르면 **부모만** 바꾼다(중첩은 새 파일 것으로 다시 생긴다).
   - **중첩 레퍼런스**(다른 레퍼런스 안의 행)도 바꿀 수 있지만 마야 규칙상 **이번 세션만**이다 — 씬을 저장해도 남지 않는다.
     확인 창과 로그에 경고가 나온다. 영구히 바꾸려면 부모 파일을 열고 거기서 바꾼다.
+- **`Import` (v01.22)** — 고른 레퍼런스를 **씬으로 임포트**한다(레퍼런스가 풀리고 노드가 이 씬 것이 된다). Reference Editor 의
+  `Import Objects from Reference` 와 같다. 우클릭 `Import Objects from Reference (n)` 도 같다.
+  1. 확인 창(임포트할 레퍼런스 목록 · **undo 안 됨**) → `Yes`.
+  2. 임포트 뒤 트리를 다시 읽는다. 로그 `Imported TOPLRN : leaf.ma`, 마지막에 `Import done : n reference(s) imported.`
+  - 네임스페이스는 그대로(`TOPL:leaf`), 씬 쪽 연결(컨스트레인트 · 키)도 그대로. 같은 파일의 복사본(`{1}`)도 그 행만 임포트된다.
+  - **언로드**는 먼저 로드한 뒤 임포트한다(`(loaded first)`) — 마야는 언로드 레퍼런스를 임포트하지 못한다. **`Missing`** 은 건너뛴다.
+  - **중첩 레퍼런스**는 마야 규칙상 **부모가 먼저 임포트돼야** 임포트된다. 부모를 같이 고르면 부모부터 차례로 처리하고,
+    중첩만 고르면 건너뛰고 `[WARN] ... can only be imported after its parent` 로 알린다.
+  - **`Include nested`** (기본 끔) — 켜면 고른 레퍼런스 안의 중첩까지 **아래로 전부** 임포트한다(언로드 중첩도 로드해서).
+    끄면 고른 것만 — 그 안의 중첩은 씬의 **최상위 레퍼런스로 남는다**(마야 기본 동작, 로그 `[Info] n nested reference(s) are now top-level ...`).
 - 여러 행은 Shift / Ctrl 로 고른다. 아무것도 안 고르고 누르면 `[WARN] No reference selected.`
 
 | 상황 | 결과 |

@@ -90,5 +90,12 @@
 #        부모 + 그 안의 중첩을 같이 고르면 부모만. 중첩 레퍼런스도 바뀌지만 마야 규칙상 **임시**(씬에 저장 안 됨) - 확인 창 · 로그에 경고.
 #        core.reference_ops.replace_plan / nested_targets / replace_references. tests/test_reference_replace.py 20 · test_reference.py 47.
 
-VERSION = "01.21"
-LAST_UPDATE = "2026-11-06"
+# 01.22  Reference > Default `Import` (버튼 + 우클릭 `Import Objects from Reference`) - 고른 레퍼런스를 씬으로 임포트
+#        (Reference Editor 의 Import Objects from Reference, 사용자 요청). 확인(undo 안 됨) -> 임포트 -> 트리 다시 읽기.
+#        부모 먼저 처리, 언로드는 로드한 뒤, Missing 은 건너뜀, 부모를 안 고른 중첩은 마야가 막으므로 건너뛰고 안내.
+#        `Include nested` 를 켜면 그 안의 중첩까지 아래로 전부(언로드 중첩도). 네임스페이스 · 씬 쪽 연결 그대로.
+#        노드로 지정(file -referenceNode -importReference) - 복사 번호 `{1}` 무관.
+#        core.reference_ops.import_plan / import_references. tests/test_reference_import.py 20 · test_reference.py 47.
+
+VERSION = "01.22"
+LAST_UPDATE = "2026-11-25"

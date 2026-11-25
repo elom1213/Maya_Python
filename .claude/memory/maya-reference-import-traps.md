@@ -31,3 +31,6 @@ mayapy 2024 실측 (2026-10-12, A00210 Maya > Reference 만들며 — 처음엔 
   접두어(`JUNMSG `)로 마야 소음과 구별. 한 번 기동에 4~5초(2024, 플러그인 적음).
 
 관련: [[wip-a00210-maya-reference-tab]], [[mayapy-headless-verify]]
+
+추가 (2026-11-25, A00480 v01.22): **중첩 레퍼런스를 직접 `importReference` 하면 에러** — "its parent file is not the top-level scene file".
+`file(referenceNode=rn, importReference=True)` 로 노드 지정하면 `{1}` 복사본도 정확히 그것만. importReference 는 undo 큐에 안 남는다.

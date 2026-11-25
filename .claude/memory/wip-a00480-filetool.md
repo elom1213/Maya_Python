@@ -68,3 +68,6 @@ UI 가 Check 와 규칙에 막힌 Export 뒤에 `select(replace)`. 통과면 선
 - **v01.21 (2026-11-06) `Replace...`** — 고른 레퍼런스를 다른 .ma/.mb 로(`file new -loadReference rn`). mayapy 실측: 네임스페이스 · 씬 쪽 컨스트레인트 유지,
   **언로드 레퍼런스를 그냥 부르면 로드돼 버린다 → `loadReferenceDepth="none"` 이면 언로드 그대로**, **중첩 레퍼런스 교체는 임시(저장해도 안 남음, 마야 경고)**,
   undo 안 됨(확인 창). 부모 + 중첩 같이 고르면 부모만. 파일 창 · 확인 창은 `_ask_file` / `_confirm` 메서드로 시험에서 교체. `test_reference_replace.py` 20.
+- **v01.22 (2026-11-25) `Import`** — 고른 레퍼런스를 씬으로(`file(referenceNode=rn, importReference=True)`, 복사 번호 무관). mayapy 실측: **중첩은 혼자 임포트 불가**
+  ("parent file is not the top-level scene file") → 부모 먼저, 그러면 최상위로 올라와 그 뒤 가능 · 언로드는 먼저 load · **undo 안 됨**(확인 창, `_confirm(text, title=)`).
+  `Include nested` = 아래로 전부. `import_plan` / `import_references`. `test_reference_import.py` 20.
