@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-05
+# last Update date : 2026-11-25
 # Framework - 씬 정리(cleanup) 공용 함수. A00600_SceneCleanup 이 쓰고, 다른 툴도 그대로 쓸 수 있다.
 #
 #   delete_display_layers()   디스플레이 레이어 전부 (defaultLayer · 레퍼런스 레이어 제외)
 #   delete_animation_layers() 애니메이션 레이어 전부 - **루트(BaseAnimation)까지** 지워 Layer Editor 에 안 보이게
+#   delete_namespaces()       네임스페이스 전부 - 노드는 루트로 옮겨 남긴다 (레퍼런스 네임스페이스 · 그 부모 제외)
 #   delete_unused_nodes()     Hypershade > Edit > Delete Unused Nodes 와 같은 것 = MEL MLdeleteUnused 그대로
 #   refresh_layer_editors()   GUI 의 Layer Editor Anim 탭 다시 그리기 (없으면 아무것도 안 함)
 #
@@ -130,6 +131,62 @@ def delete_animation_layers():
         result.warnings.append(
             "{0} stays visible : {1} referenced animation layer(s) can not be deleted ({2})".format(
                 root or "BaseAnimation", len(referenced), ", ".join(referenced)))
+    return result
+
+
+# ------------------------------------------------------------------ namespaces
+
+_SYSTEM_NAMESPACES = ("UI", "shared")     # 마야 내부 - 지울 수 없다
+
+
+def _reference_namespaces():
+    """레퍼런스 노드가 쓰는 네임스페이스(앞 ':' 없이). 지울 수 없다(read-only)."""
+    spaces = set()
+    for ref_node in cmds.ls(type="reference") or []:
+        try:
+            ns = cmds.referenceQuery(ref_node, namespace=True) or ""
+        except RuntimeError:          # sharedReferenceNode · 파일 없는 레퍼런스 노드
+            continue
+        if ns.strip(":"):
+            spaces.add(ns.strip(":"))
+    return spaces
+
+
+def delete_namespaces():
+    """씬의 네임스페이스를 전부 지운다 - **안의 노드는 루트로 옮겨 남긴다**(`A:box` → `box`).
+
+    `namespace -removeNamespace -mergeNamespaceWithRoot` 를 **깊은 것부터** 부른다. 부모를 바로 지우면
+    자식 네임스페이스가 지워지지 않고 루트로 올라오기 때문(실측). 이름이 겹치면 마야가 `box1` 처럼 바꾼다.
+
+    레퍼런스 네임스페이스는 read-only 라 못 지운다 → 남기고 경고. 그 **부모** 네임스페이스도 남긴다 -
+    부모를 지우면 마야가 레퍼런스 네임스페이스를 루트로 옮겨 레퍼런스 이름이 바뀐다(실측).
+    `UI` · `shared` 는 마야 내부라 대상이 아니다.
+    """
+    result = CleanupResult()
+    spaces = [ns for ns in (cmds.namespaceInfo(":", listOnlyNamespaces=True, recurse=True) or [])
+              if ns.split(":")[0] not in _SYSTEM_NAMESPACES]
+    if not spaces:
+        return result
+    referenced = _reference_namespaces()
+    kept = []           # 못 지운 네임스페이스 - 그 부모도 남긴다
+    for ns in sorted(spaces, key=lambda n: n.count(":"), reverse=True):
+        if ns in referenced:
+            kept.append(ns)
+            continue
+        if any(k.startswith(ns + ":") for k in kept):
+            kept.append(ns)
+            result.warnings.append("Kept namespace {0} : it holds a namespace that can not be removed".format(ns))
+            continue
+        try:
+            cmds.namespace(removeNamespace=":" + ns, mergeNamespaceWithRoot=True)
+            result.removed.append(ns)
+        except RuntimeError as exc:
+            kept.append(ns)
+            result.warnings.append("Could not remove namespace {0} : {1}".format(ns, str(exc).strip()))
+    refs = sorted(ns for ns in kept if ns in referenced)
+    if refs:
+        result.warnings.append("Kept {0} referenced namespace(s) : {1} (import the reference to remove)".format(
+            len(refs), ", ".join(refs)))
     return result
 
 

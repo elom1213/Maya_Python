@@ -1,8 +1,8 @@
 ---
 title: A00600_SceneCleanup 사용법
 aliases: [Scene Cleanup, SceneCleanup, A00600]
-tags: [maya-python, tool-guide, scene-cleanup, display-layer, anim-layer, hypershade]
-updated: 2026-11-05
+tags: [maya-python, tool-guide, scene-cleanup, display-layer, anim-layer, namespace, hypershade]
+updated: 2026-11-25
 ---
 
 # A00600_SceneCleanup 사용법
@@ -11,7 +11,7 @@ updated: 2026-11-05
 창을 열 때마다 **모든 항목이 체크**되어 있고, `Run Cleanup` 한 번 → 확인 → 위에서부터 순서대로 실행한다.
 **Ctrl+Z 한 번**에 정리 전체가 되돌아간다.
 
-- **버전**: `app/config/version.py` (v01.00)
+- **버전**: `app/config/version.py` (v01.01)
 - **설치**: `__dragDrop_A00600.py` 를 Maya 뷰포트로 드래그&드롭 → 셸프 버튼 **Cleanup** → `tools.A00600_SceneCleanup.run(True)`
   (ToolLauncher `UTIL` 프로파일 `Scene` 칸에도 있다)
 - **계획서**: [`plans/A00600_SceneCleanup_plan.md`](plans/A00600_SceneCleanup_plan.md) (마야 실측 근거 §2)
@@ -22,7 +22,8 @@ updated: 2026-11-05
 |------|-----------|---------|
 | 1 | `Delete all display layers` | 디스플레이 레이어 전부. `defaultLayer` 는 마야 내부 노드라 남는다. 멤버 오브젝트는 그대로. |
 | 2 | `Delete all animation layers (incl. BaseAnimation)` | 애니메이션 레이어 전부 — **루트 `BaseAnimation` 까지 지워 Layer Editor 의 Anim 탭에 아무것도 안 보이게** 한다. |
-| 3 | `Delete unused nodes (Hypershade)` | **Hypershade > Edit > Delete Unused Nodes 와 똑같다** — 마야 MEL `MLdeleteUnused` 를 그대로 부른다. |
+| 3 | `Delete all namespaces` | 네임스페이스 전부 — **안의 노드는 루트로 옮겨 남긴다**(`CHR:box` → `box`). 레퍼런스 네임스페이스와 그 부모는 남긴다. |
+| 4 | `Delete unused nodes (Hypershade)` | **Hypershade > Edit > Delete Unused Nodes 와 똑같다** — 마야 MEL `MLdeleteUnused` 를 그대로 부른다. |
 
 ### 애니메이션 레이어 — 주의
 
@@ -33,6 +34,16 @@ updated: 2026-11-05
 - 잠긴 레이어 · 중첩 레이어도 지운다.
 - **레퍼런스에서 온 애니메이션 레이어가 있으면 루트를 지울 수 없다**(마야 한계) → 로컬 레이어만 지우고
   `[WARN] BaseAnimation stays visible : ...` 경고를 낸다. 레퍼런스를 임포트한 뒤 다시 돌리면 사라진다.
+
+### 네임스페이스 — 노드는 남고 이름만 루트로
+
+- 마야 `namespace -removeNamespace -mergeNamespaceWithRoot` 를 **깊은 것부터** 부른다(`A:B` → `A`).
+  부모를 먼저 지우면 자식 네임스페이스가 지워지지 않고 루트로 올라와 남는다(실측).
+- 루트에 같은 이름이 있으면 **마야가 이름을 바꾼다**(`CHR:box` → `box1`). 잠긴 노드도 옮겨진다(잠금 유지).
+- **레퍼런스 네임스페이스는 read-only 라 못 지운다** → 남기고 `[WARN] Kept N referenced namespace(s)`.
+  그 레퍼런스를 담은 **부모 네임스페이스도 남긴다** — 부모를 지우면 마야가 레퍼런스 네임스페이스를 루트로 옮겨
+  레퍼런스 이름이 바뀌기 때문(실측). 레퍼런스를 임포트(A00480 `Import`)한 뒤 다시 돌리면 지워진다.
+- `UI` · `shared` 는 마야 내부 네임스페이스라 대상이 아니다.
 
 ### Unused nodes — Hypershade 와 같은 것
 
@@ -77,12 +88,12 @@ A00600_SceneCleanup/
 ├─ app/core/cleanup_items.py               # CleanupItem + ITEMS 레지스트리
 ├─ app/core/cleanup_runner.py              # 체크한 항목 순서대로, undo 청크 하나, Layer Editor 갱신
 ├─ app/ui/main_window.py
-└─ tests/test_scene_cleanup.py             # mayapy 오프스크린 33/33
-Framework/core/maya_cleanup.py             # delete_display_layers · delete_animation_layers · delete_unused_nodes · refresh_layer_editors
+└─ tests/test_scene_cleanup.py             # mayapy 오프스크린 42/42
+Framework/core/maya_cleanup.py             # delete_display_layers · delete_animation_layers · delete_namespaces · delete_unused_nodes · refresh_layer_editors
 ```
 
 ## 5. 시험
 
-`"C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" tests/test_scene_cleanup.py` — 33/33 (2026-11-05).
-전부 실행 · undo 한 번 복원 · 체크 안 한 항목 · `BaseAnimation` 홀로 · 중첩 · 잠긴 레이어 · Hypershade 대조 · 레퍼런스 레이어 · 항목 예외 · UI.
+`"C:\Program Files\Autodesk\Maya2024\bin\mayapy.exe" tests/test_scene_cleanup.py` — 42/42 (2026-11-25).
+전부 실행 · undo 한 번 복원 · 체크 안 한 항목 · `BaseAnimation` 홀로 · 중첩 · 잠긴 레이어 · Hypershade 대조 · 레퍼런스 레이어 · 항목 예외 · UI · 네임스페이스(중첩 · 이름 충돌 · 잠긴 노드 · 레퍼런스와 그 부모 남김 · undo).
 **GUI 확인 아직.**

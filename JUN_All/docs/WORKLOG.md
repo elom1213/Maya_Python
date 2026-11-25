@@ -33,6 +33,13 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-25 (오늘)
 
+> [!summary] **`A00600_SceneCleanup` v01.01 — 항목 `Delete all namespaces`** `#A00600_SceneCleanup`
+- 요청: 씬의 모든 네임스페이스 지우기 규칙. 노드는 남기고 루트로 옮긴다(`removeNamespace` + `mergeNamespaceWithRoot`), 창을 열 때 체크.
+- mayapy 실측: 부모부터 지우면 자식 네임스페이스가 루트로 올라와 남음 → 깊은 것부터 · 이름 충돌은 마야가 `box1` · 레퍼런스 네임스페이스는 read-only ·
+  레퍼런스를 담은 부모를 지우면 레퍼런스 네임스페이스가 루트로 옮겨짐 → 그 부모도 남기고 경고.
+- 공용 `Framework/core/maya_cleanup.delete_namespaces` 추가, 실행 순서는 Unused nodes 앞. Done 줄의 `node(s)` 문구 제거(네임스페이스는 노드가 아님).
+- 시험 `test_scene_cleanup.py` 42 (새 9).
+
 > [!summary] **`A00210_FileManager` v01.59 — Path Structure : 체크 해제한 폴더는 하위까지 만들지 않음** `#A00210_FileManager`
 - 사용자 보고: 상위 경로를 체크 해제해도 하위가 체크돼 있으면 하위(와 상위)가 생성된다. 원인 = Recreate 가 해제한 경로 **자신만** 빼서
   남은 `a/b` 를 makedirs 가 부모째 만들었다(문서에도 "상위 폴더는 자동 생성" 으로 적혀 있던 동작).

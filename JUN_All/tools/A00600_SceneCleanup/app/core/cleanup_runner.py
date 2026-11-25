@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-05
+# last Update date : 2026-11-25
 # A00600_SceneCleanup - 체크한 항목을 순서대로 실행한다.
 #
 # - undo 청크 하나 : Ctrl+Z 한 번에 전부 되돌린다.
@@ -51,6 +51,6 @@ def run_items(items, log=None):
 
     total = sum(len(r.removed) for _, r, _ in outcomes if r)
     errors = sum(1 for _, _, e in outcomes if e)
-    _log("Done : {0} node(s) removed by {1} item(s){2}. Ctrl+Z undoes the whole cleanup.".format(
+    _log("Done : {0} removed by {1} item(s){2}. Ctrl+Z undoes the whole cleanup.".format(
         total, len(items), ", {0} failed".format(errors) if errors else ""))
     return outcomes

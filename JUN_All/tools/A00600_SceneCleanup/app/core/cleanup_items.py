@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-05
+# last Update date : 2026-11-25
 # A00600_SceneCleanup - 정리 항목 레지스트리.
 #
 # **새 항목 = CleanupItem 서브클래스 하나 + 아래 ITEMS 에 한 줄.** UI 는 ITEMS 를 읽어 체크 행을 만들고,
@@ -43,6 +43,17 @@ class AnimLayersItem(CleanupItem):
         return maya_cleanup.delete_animation_layers()
 
 
+class NamespacesItem(CleanupItem):
+    key = "namespaces"
+    label = "Delete all namespaces"
+    tooltip = ("Remove every namespace in the scene. The nodes stay and move to the root (A:box -> box).\n"
+               "If a name is already taken Maya renames the node (box1).\n"
+               "Referenced namespaces, and the namespaces that hold them, are kept.")
+
+    def run(self):
+        return maya_cleanup.delete_namespaces()
+
+
 class UnusedNodesItem(CleanupItem):
     key = "unused_nodes"
     label = "Delete unused nodes (Hypershade)"
@@ -59,6 +70,7 @@ class UnusedNodesItem(CleanupItem):
 ITEMS = [
     DisplayLayersItem(),
     AnimLayersItem(),
+    NamespacesItem(),
     UnusedNodesItem(),
 ]
 

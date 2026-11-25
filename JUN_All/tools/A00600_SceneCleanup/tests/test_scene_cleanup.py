@@ -53,6 +53,14 @@ def build():
     cmds.connectAttr(tex + ".outColor", unused + ".color")
     usg = cmds.sets(renderable=True, noSurfaceShader=True, empty=True, name="emptySG")
     cmds.shadingNode("multiplyDivide", asUtility=True, name="loneMD")
+    # 네임스페이스 CHR · CHR:sub - 루트 box 와 이름이 겹치는 CHR:box, 중첩 CHR:sub:item
+    cmds.namespace(add="CHR")
+    cmds.namespace(add="sub", parent=":CHR")
+    cmds.namespace(set=":CHR")
+    cmds.spaceLocator(name="box")
+    cmds.namespace(set=":CHR:sub")
+    cmds.spaceLocator(name="item")
+    cmds.namespace(set=":")
     cmds.select(clear=True)
     return cube, usg
 
@@ -61,8 +69,13 @@ def layers():
     return sorted(cmds.ls(type="displayLayer") or []), sorted(cmds.ls(type="animLayer") or [])
 
 
+def namespaces():
+    return sorted(ns for ns in (cmds.namespaceInfo(":", listOnlyNamespaces=True, recurse=True) or [])
+                  if ns not in ("UI", "shared"))
+
+
 # ---------------------------------------------------------------- 1. 레지스트리
-check("1 registry order", [i.key for i in CI.ITEMS] == ["display_layers", "anim_layers", "unused_nodes"])
+check("1 registry order", [i.key for i in CI.ITEMS] == ["display_layers", "anim_layers", "namespaces", "unused_nodes"])
 check("1 every item default checked", all(i.default for i in CI.ITEMS))
 check("1 labels are English ascii", all(i.label.isascii() and i.tooltip.isascii() for i in CI.ITEMS))
 
@@ -81,12 +94,16 @@ check("2 objects kept", cmds.objExists("box") and cmds.objExists("ball"))
 tx = cmds.getAttr("box.tx", time=10)
 check("2 Base keys kept on tx (AL1 key gone)", abs(tx - 5.0) < 1e-6 and cmds.keyframe("box.tx", q=True, keyframeCount=True) == 2,
       (tx, cmds.keyframe("box.tx", q=True, timeChange=True)))
-check("2 three outcomes, no error", len(out) == 3 and all(e is None for _, _, e in out))
+check("2 namespaces all gone", namespaces() == [], namespaces())
+check("2 namespace nodes moved to root (clash renamed)", cmds.objExists("item") and cmds.objExists("box1")
+      and cmds.nodeType(cmds.listRelatives("box1", shapes=True, fullPath=True)[0]) == "locator")
+check("2 four outcomes, no error", len(out) == 4 and all(e is None for _, _, e in out))
 check("2 log has Done line", any(l.startswith("Done : ") for l in logs), logs[-1:])
 cmds.undo()
 check("2 one undo restores every node", set(cmds.ls()) == before_nodes, sorted(before_nodes ^ set(cmds.ls()))[:8])
 disp, anim = layers()
 check("2 undo restores layers", disp == ["L_ball", "L_geo", "defaultLayer"] and anim == ["AL1", "BaseAnimation"], (disp, anim))
+check("2 undo restores namespaces", namespaces() == ["CHR", "CHR:sub"] and cmds.objExists("CHR:sub:item"), namespaces())
 
 # ---------------------------------------------------------------- 3. 체크 안 한 항목은 안 돈다
 build()
@@ -175,7 +192,7 @@ check("9 run with nothing checked does nothing", layers()[1] == ["AL1", "BaseAni
 w.set_all_checked(True)
 check("9 Check All", [i.key for i in w.checked_items()] == [i.key for i in CI.ITEMS])
 lw.item(1).setCheckState(Qt.Unchecked)
-check("9 checked_items skips unchecked", [i.key for i in w.checked_items()] == ["display_layers", "unused_nodes"])
+check("9 checked_items skips unchecked", [i.key for i in w.checked_items()] == ["display_layers", "namespaces", "unused_nodes"])
 w.run_cleanup()
 disp, anim = layers()
 check("9 run: anim layers untouched, others cleaned", disp == ["defaultLayer"] and anim == ["AL1", "BaseAnimation"]
@@ -184,6 +201,42 @@ check("9 log shows Done", "Done : " in w.log_view.toPlainText())
 w2 = MW.MainWindow()
 check("9 reopened window is all checked again", all(w2.lw_items.item(i).checkState() == Qt.Checked
                                                      for i in range(w2.lw_items.count())))
+
+# ---------------------------------------------------------------- 10. 네임스페이스
+cmds.file(new=True, force=True)
+check("10 empty scene -> nothing", MC.delete_namespaces().removed == [])
+cmds.namespace(add="EMPTY")
+cmds.namespace(add="A")
+cmds.namespace(add="B", parent=":A")
+cmds.namespace(set=":A:B")
+lk = cmds.polyCube(name="lockedBox")[0]
+cmds.lockNode(lk, lock=True)
+cmds.namespace(set=":")
+res = MC.delete_namespaces()
+check("10 nested + empty removed deepest first", namespaces() == [] and sorted(res.removed) == ["A", "A:B", "EMPTY"]
+      and res.removed.index("A:B") < res.removed.index("A"), res)
+check("10 locked node moved to root, still locked", cmds.objExists("lockedBox") and cmds.lockNode("lockedBox", q=True, lock=True)[0])
+
+# 레퍼런스: REF2(루트) · OUT:REF(로컬 부모 아래) · 로컬 LOC
+small = os.path.join(TMP, "ns_ref.ma")
+cmds.file(new=True, force=True)
+cmds.polyCube(name="rb")
+cmds.file(rename=small)
+cmds.file(save=True, type="mayaAscii", force=True)
+cmds.file(new=True, force=True)
+cmds.namespace(add="OUT")
+cmds.file(small, reference=True, namespace=":OUT:REF")
+cmds.file(small, reference=True, namespace="REF2")
+cmds.namespace(add="LOC")
+cmds.namespace(set=":LOC")
+cmds.spaceLocator(name="loc")
+cmds.namespace(set=":")
+res = MC.delete_namespaces()
+check("10 local namespace removed", "LOC" in res.removed and cmds.objExists("loc"), res)
+check("10 referenced + their parent kept", namespaces() == ["OUT", "OUT:REF", "REF2"]
+      and cmds.objExists("OUT:REF:rb") and cmds.objExists("REF2:rb"), namespaces())
+check("10 warnings for referenced + parent", any("referenced namespace" in w for w in res.warnings)
+      and any("Kept namespace OUT" in w for w in res.warnings), res.warnings)
 
 print("\n{0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
