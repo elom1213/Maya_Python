@@ -74,5 +74,11 @@
 
 # 01.47  Weights > Move · Smooth 슬라이더도 보이게 - Flood(v01.45)와 같은 공용 JUN_mod_sliderStyle_qt_v01 한 줄씩.
 
-VERSION = "01.47"
-LAST_UPDATE = "2026-11-19"
+# 01.48  Weights > Flood - Joints 리스트가 계층으로 : 아웃라이너 순서(깊이 우선) + 리스트 안 조상 수만큼 들여쓰기(`└`).
+#        글자는 그대로(그릴 때만), 순서를 손으로 바꾸는 Up/Down/Sort 는 뺐다(Flood 결과는 순서와 무관).
+#        `Select in List` 버튼 - 씬에서 고른 조인트를 리스트에서 골라 준다(같은 이름도 구별, 씬 선택은 그대로).
+#        Flood 는 리스트에서 고른 행이 있으면 **그 조인트만**, 없으면 전부(버튼에 `N selected joint(s)`).
+#        공용 TSL 에 select_by_nodes · arrange(depths) · node_at · DEPTH_ROLE · btn_add 추가(기존 동작 그대로).
+
+VERSION = "01.48"
+LAST_UPDATE = "2026-11-25"

@@ -209,6 +209,74 @@ for _label, _tab, _count in (("Move", win.move_tab, 2), ("Smooth", win.smooth_ta
     check("{0} slider groove is visible (middle row)".format(_label), _vis > _img.width() * 0.8, (_vis, _img.width()))
 win.hide()
 
+# ---- v01.48 계층 표시 + Select in List (리스트 선택 = Flood 대상)
+from PySide2.QtWidgets import QStyleOptionViewItem   # noqa: E402
+from Framework.qt import MOD_tsl_qt_v01 as T48   # noqa: E402
+cmds.file(new=True, force=True)
+cmds.polyPlane(name="m48", w=10, h=2, sx=20, sy=4)
+cmds.select(clear=True)
+cmds.joint(name="root", position=(-4, 0, 0))
+cmds.joint(name="dup", position=(0, 0, 0))
+cmds.joint(name="tip", position=(4, 0, 0))
+cmds.select(clear=True)
+cmds.group(empty=True, name="G")
+cmds.select(clear=True)
+other48 = cmds.joint(name="dup", position=(0, 0, 3))
+cmds.parent(other48, "G")
+j48 = cmds.ls(type="joint", long=True)
+skin48 = cmds.skinCluster(j48, "m48", toSelectedBones=True)[0]
+logs48 = []
+t48 = ft.FloodTab(log_callback=logs48.append)
+_row48 = [t48.tsl_joints.edit_row.itemAt(i).widget().text() for i in range(t48.tsl_joints.edit_row.count())]
+check("Up/Down/Sort hidden on the Flood list",
+      _row48 == ["Get Bound Joints", "Add Influence", "Select in List", "Add", "Del"], _row48)
+cmds.select(["|root|dup|tip", "|G|dup", "|root", "|root|dup"])   # 일부러 뒤섞은 순서
+t48.tsl_joints.btn_select.click()
+got48 = [t48.tsl_joints.node_at(i) for i in range(t48.tsl_joints.count())]
+check("Select Joints lists in outliner hierarchy order",
+      got48 == ["|root", "|root|dup", "|root|dup|tip", "|G|dup"], got48)
+deps48 = [t48.tsl_joints.list_widget.item(i).data(T48.DEPTH_ROLE) for i in range(4)]
+check("depth = listed ancestors", deps48 == [0, 1, 2, 0], deps48)
+check("item text unchanged (only drawn indented)",
+      sorted(t48.tsl_joints.get_all_items()) == sorted(cmds.ls(["|root", "|root|dup", "|root|dup|tip", "|G|dup"])),
+      t48.tsl_joints.get_all_items())
+opt48 = QStyleOptionViewItem()
+t48.tsl_joints.list_widget.itemDelegate().initStyleOption(opt48, t48.tsl_joints.list_widget.model().index(2, 0))
+check("tip is drawn indented under dup", opt48.text == T48.INDENT_TEXT + T48.BRANCH_TEXT + "tip", repr(opt48.text))
+t48.tsl_joints.set_items([])
+cmds.select("m48")
+t48.btn_bound.click()
+got48 = [t48.tsl_joints.node_at(i) for i in range(t48.tsl_joints.count())]
+check("Get Bound Joints lists in hierarchy order",
+      got48 == ["|root", "|root|dup", "|root|dup|tip", "|G|dup"], got48)
+
+cmds.select(["|root|dup", "|root|dup|tip"])
+t48.btn_pick.click()
+check("Select in List selects the scene-selected joints (same name kept apart)",
+      t48.tsl_joints.selected_nodes() == ["|root|dup", "|root|dup|tip"], t48.tsl_joints.selected_nodes())
+check("scene selection untouched", cmds.ls(sl=True, long=True) == ["|root|dup", "|root|dup|tip"])
+check("Flood button counts the list selection", "2 selected joint" in t48.btn_flood.text(), t48.btn_flood.text())
+check("joints() = selected rows only", t48.joints() == ["|root|dup", "|root|dup|tip"], t48.joints())
+cmds.select("m48")
+logs48[:] = []
+t48.btn_flood.click()
+w_root = max(cmds.skinPercent(skin48, "m48.vtx[{0}]".format(v), q=True, transform="|root")
+             for v in range(cmds.polyEvaluate("m48", vertex=True)))
+check("flood used only the selected rows (root gets nothing)",
+      w_root < 1e-6 and any(m.startswith("[OK]") for m in logs48), (w_root, logs48))
+cmds.group(empty=True, name="nope")
+cmds.select(["|G|dup", "|root", "nope"])
+t48.btn_pick.click()
+check("Select in List : only listed joints, re-selects",
+      t48.tsl_joints.selected_nodes() == ["|root", "|G|dup"], t48.tsl_joints.selected_nodes())
+t48.tsl_joints.list_widget.clearSelection()
+check("no list selection -> every joint", len(t48.joints()) == 4 and "4 joint" in t48.btn_flood.text(),
+      t48.btn_flood.text())
+cmds.select("nope")
+logs48[:] = []
+t48.btn_pick.click()
+check("no joint selected -> warning", any("Select joints in the scene" in m for m in logs48), logs48)
+
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)

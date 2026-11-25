@@ -1,12 +1,15 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-19
-# A00275_skinTool_V01 - Weights > Flood 탭 UI (v01.40)
+# last Update date : 2026-11-25
+# A00275_skinTool_V01 - Weights > Flood 탭 UI (v01.40, v01.48 Select in List)
 """
 Weights > Flood - 고른 조인트(들)에 웨이트를 채운다. Kangaroo `SkinCluster > Flood` 이식.
 
 로직은 전부 `app/core/weight_flood_manager.py` 에 있다 - 여기서는 위젯 값만 읽어 넘긴다.
 옵션 이름과 기본값은 원본과 1:1 이다(Smooth Steps 4 · Joint Lines = All children · Border Mask Steps 1).
+
+**리스트 선택 = Flood 대상** (v01.48) : 리스트에서 행을 고르면 그 조인트만, 안 고르면 리스트 전부를 Flood 한다.
+`Select in List` 는 씬에서 고른 조인트를 리스트에서 골라 준다(바인드 조인트를 다 읽어 둔 뒤 일부만 Flood 할 때).
 
 **같은 이름 조인트** : 조인트 리스트는 담을 때 UUID 를 붙이고, 실행할 때 `get_all_nodes()` 로 **풀패스**를 넘긴다.
 원본은 짧은 이름을 넘겨서 씬에 같은 이름 조인트가 있으면 죽는다(이 이식의 핵심 개선, 코어 독스트링 참고).
@@ -112,7 +115,12 @@ class FloodTab(QWidget):
 
         top = QHBoxLayout()
         self.tsl_joints = JUN_mod_tsl_qt.JUN_mod_tsl_qt_v01(
-            name_display=True, title="Joints", select_label="Select Joints", log_callback=self._log)
+            name_display=True, title="Joints", select_label="Select Joints", log_callback=self._log,
+            show_up=False, show_down=False, show_sort=False)
+        # v01.48 - 리스트는 늘 아웃라이너 계층 순서 + 들여쓰기 -> 순서를 손으로 바꾸는 Up/Down/Sort 는 뺐다
+        # (Flood 결과는 리스트 순서와 무관하다). Select/Add 는 위젯 슬롯이 먼저 돈 뒤 여기서 정렬한다.
+        self.tsl_joints.btn_select.clicked.connect(self._apply_hierarchy)
+        self.tsl_joints.btn_add.clicked.connect(self._apply_hierarchy)
         # v01.41 - 메시를 고르고 누르면 그 메시에 바인드된 조인트로 리스트를 채운다.
         self.btn_bound = self.tsl_joints.add_button("Get Bound Joints", self.on_get_bound_joints, index=0)
         self.btn_bound.setToolTip(
@@ -126,6 +134,14 @@ class FloodTab(QWidget):
             "Add the joints selected in the scene to the skinCluster of the mesh(es)\n"
             "read by Get Bound Joints, with weight 0 (like Maya's Skin > Add Influence),\n"
             "and put them in the list. The mesh shape does not change.")
+        # v01.48 - 씬에서 고른 조인트를 리스트에서 골라 준다 -> 이어서 Flood 하면 그 조인트만.
+        self.btn_pick = self.tsl_joints.add_button("Select in List", self.on_select_in_list, index=2)
+        self.btn_pick.setToolTip(
+            "Select, in this list, the joints you selected in the scene\n"
+            "(e.g. after Get Bound Joints, pick a few of them in the viewport or Outliner).\n"
+            "Flood then works only on the joints selected in the list.\n"
+            "Joints with the same name are told apart.")
+        self.tsl_joints.list_widget.itemSelectionChanged.connect(self._update_button)
         model = self.tsl_joints.list_widget.model()
         model.rowsInserted.connect(self._update_button)
         model.rowsRemoved.connect(self._update_button)
@@ -332,7 +348,12 @@ class FloodTab(QWidget):
         if not hasattr(self, "btn_flood"):
             return
         n = len(self.tsl_joints.get_all_items())
-        self.btn_flood.setText("Flood  {0} joint(s)".format(n) if n else "Flood")
+        picked = len(self.tsl_joints.selected_items())
+        if picked:
+            text = "Flood  {0} selected joint(s)".format(picked)
+        else:
+            text = "Flood  {0} joint(s)".format(n) if n else "Flood"
+        self.btn_flood.setText(text)
         self.btn_flood.setEnabled(bool(n))
 
     # ==============================================================
@@ -356,12 +377,17 @@ class FloodTab(QWidget):
         }
 
     def joints(self):
-        """리스트의 조인트를 **풀패스**로 (UUID 로 푼다 - 같은 이름 · 리네임 · 리페어런트 안전).
+        """Flood 할 조인트를 **풀패스**로 (UUID 로 푼다 - 같은 이름 · 리네임 · 리페어런트 안전).
 
+        v01.48 - 리스트에서 고른 행이 있으면 **그 행만**, 없으면 리스트 전부.
         씬에서 사라진 항목은 빠지고, 그 수를 로그에 남긴다.
         """
-        texts = self.tsl_joints.get_all_items()
-        nodes = self.tsl_joints.get_all_nodes()
+        if self.tsl_joints.selected_items():
+            texts = self.tsl_joints.selected_items()
+            nodes = self.tsl_joints.selected_nodes()
+        else:
+            texts = self.tsl_joints.get_all_items()
+            nodes = self.tsl_joints.get_all_nodes()
         if len(nodes) < len(texts):
             self._log("[WARN] {0} listed joint(s) are no longer in the scene - skipped.".format(
                 len(texts) - len(nodes)))
@@ -414,7 +440,43 @@ class FloodTab(QWidget):
             return
         names = [(cmds.ls(j) or [j])[0] for j in joints]
         self.tsl_joints.set_items(names)
+        self._apply_hierarchy()
         self._log("[OK] Listed {0} bound joint(s).".format(len(names)))
+
+    # ---------------- 계층 표시 (v01.48) ----------------
+
+    def _apply_hierarchy(self, *args):
+        """리스트를 아웃라이너 계층 순서로 다시 놓고, 리스트 안 조상 수만큼 들여 쓴다(글자는 그대로)."""
+        tsl = self.tsl_joints
+        if tsl.is_deferred() or not tsl.count():
+            return
+        nodes = [tsl.node_at(i) or tsl.list_widget.item(i).text() for i in range(tsl.list_widget.count())]
+        order, depths = fl_mgr.hierarchy_order(nodes)
+        tsl.arrange(order, depths)
+
+    # ---------------- Select in List (v01.48) ----------------
+
+    def on_select_in_list(self, *args):
+        """씬에서 고른 조인트 중 리스트에 있는 것을 리스트에서 선택한다(씬 선택은 건드리지 않는다).
+
+        비교는 풀패스(UUID) 기준이라 같은 이름 조인트도 정확히 그 행만 잡힌다.
+        """
+        import maya.cmds as cmds
+        selected = cmds.ls(sl=True, type="joint", long=True) or []
+        if not selected:
+            self._log("[WARN] Select joints in the scene first.")
+            return
+        if self.tsl_joints.is_deferred():
+            self.tsl_joints.show_all()
+        rows = self.tsl_joints.select_by_nodes(selected)
+        self._update_button()
+        missing = len(selected) - len(rows)
+        if not rows:
+            self._log("[WARN] None of the {0} selected joint(s) are in the list.".format(len(selected)))
+            return
+        self._log("[OK] Selected {0} joint(s) in the list - Flood will use only these.".format(len(rows)))
+        if missing > 0:
+            self._log("[WARN] {0} selected joint(s) are not in the list - skipped.".format(missing))
 
     # ---------------- Add Influence (v01.42) ----------------
 
@@ -463,6 +525,7 @@ class FloodTab(QWidget):
         listed = [j for j in selected if j in bound]
         if listed:
             self.tsl_joints.append_unique([(cmds.ls(j) or [j])[0] for j in listed])
+            self._apply_hierarchy()
 
     def on_flood(self, *args):
         joints = self.joints()

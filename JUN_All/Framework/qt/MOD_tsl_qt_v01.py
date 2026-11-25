@@ -156,6 +156,13 @@ class _NameDelegate(QStyledItemDelegate):
             return display_name(text)
         return text
 
+    def initStyleOption(self, option, index):
+        """깊이(DEPTH_ROLE)가 있는 행은 **그리는 글자만** 들여 쓴다 - 항목 글자는 그대로(계층 표시, 2026-11-25~)."""
+        super().initStyleOption(option, index)
+        depth = index.data(DEPTH_ROLE)
+        if depth:
+            option.text = INDENT_TEXT * (int(depth) - 1) + BRANCH_TEXT + option.text
+
     def helpEvent(self, event, view, option, index):
         owner = self._owner()
         if (owner is not None and event is not None and event.type() == QEvent.ToolTip
@@ -169,6 +176,10 @@ class _NameDelegate(QStyledItemDelegate):
 # 항목에 (uuid, component) 를 보관하는 Qt 역할. 호출부가 Qt.UserRole 을 쓰는 경우와
 # 겹치지 않도록 +1 을 쓴다.
 UUID_ROLE = Qt.UserRole + 1
+# 계층 깊이(int) - 0/None = 맨 위. name_display 델리게이트가 그릴 때만 들여 쓴다(`arrange(depths=)`).
+DEPTH_ROLE = Qt.UserRole + 2
+INDENT_TEXT = "      "
+BRANCH_TEXT = u"└ "     # └
 
 
 # ---- 이름 표시 모드 (2026-11-19~, 모듈 독스트링 "이름 표시 모드") -------------------
@@ -575,8 +586,9 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
         # 편집 버튼 행: Add / Del / Up / Down (+ add_button 으로 커스텀 버튼 추가 가능)
         self.edit_row = QHBoxLayout()
+        self.btn_add = None
         if self.show_add:
-            btn = QPushButton("Add")
+            btn = self.btn_add = QPushButton("Add")     # 호출부가 Add 뒤에 이어 붙일 수 있게 보관
             btn.clicked.connect(self._on_add)
             self.edit_row.addWidget(btn)
         if self.show_del:
@@ -686,6 +698,10 @@ class JUN_mod_tsl_qt_v01(QWidget):
 
         self._update_number()
 
+    def node_at(self, row):
+        """row 행이 가리키는 **현재** 노드 경로(UUID 로 푼다). 씬에 없으면 None."""
+        return self._node_of(self.list_widget.item(row))
+
     def selected_items(self):
         return [item.text() for item in self.list_widget.selectedItems()]
 
@@ -706,6 +722,63 @@ class JUN_mod_tsl_qt_v01(QWidget):
             if self.list_widget.item(i).text() in target:
                 self.list_widget.item(i).setSelected(True)
         self.list_widget.blockSignals(False)
+
+    def select_by_nodes(self, nodes):
+        """주어진 씬 노드와 **같은 노드**인 항목을 리스트에서 선택하고, 선택한 행 번호를 돌려준다.
+
+        비교는 텍스트가 아니라 **현재 풀패스**로 한다 — 항목은 UUID 로 풀고(`_node_of`), 입력은
+        `cmds.ls(long=True)` 로 푼다. 그래서 같은 이름 노드(`A|dup` / `B|dup`)도 구별되고, 담은 뒤
+        리네임 · 리페어런트돼도 맞는다. 씬 선택 시그널은 막는다(씬 선택을 리스트에 비추는 용도라
+        되돌려 씬을 다시 고를 필요가 없다). 요약 모드(펼치지 않은 목록)면 아무것도 안 하고 [] .
+        """
+        cmds = _cmds()
+        if cmds is None or self._deferred is not None:
+            return []
+        wanted = set()
+        for node in nodes or []:
+            try:
+                wanted.update(cmds.ls(node, long=True) or [])
+            except Exception:
+                continue
+        rows = []
+        self.list_widget.blockSignals(True)
+        try:
+            self.list_widget.clearSelection()
+            for i in range(self.list_widget.count()):
+                item = self.list_widget.item(i)
+                if self._node_of(item) in wanted:
+                    item.setSelected(True)
+                    rows.append(i)
+        finally:
+            self.list_widget.blockSignals(False)
+        if rows:
+            self.list_widget.scrollToItem(self.list_widget.item(rows[0]))
+        return rows
+
+    def arrange(self, order, depths=None):
+        """행을 `order`(지금 행 번호 목록) 순서로 다시 놓는다. UUID · 선택은 그대로 따라간다.
+
+        `depths` 를 주면 새 순서의 행마다 계층 깊이(DEPTH_ROLE)를 붙인다 - `name_display=True` 리스트는
+        깊이만큼 들여 써서 그린다(항목 글자는 그대로). 계층 정렬 자체는 호출부가 한다(씬 지식이 필요).
+        `order` 에 없는 행은 뒤에 원래 순서로 붙는다. 요약 모드면 아무것도 안 한다.
+        """
+        if self._deferred is not None:
+            return
+        records = self._records()
+        selected = set(self.selected_rows())
+        rows = [r for r in order if 0 <= r < len(records)]
+        placed = set(rows)
+        rows += [r for r in range(len(records)) if r not in placed]
+        self._set_records([records[r] for r in rows])
+        self.list_widget.blockSignals(True)
+        try:
+            for i, r in enumerate(rows):
+                item = self.list_widget.item(i)
+                item.setData(DEPTH_ROLE, int(depths[i]) if depths and i < len(depths) else None)
+                if r in selected:
+                    item.setSelected(True)
+        finally:
+            self.list_widget.blockSignals(False)
 
     def is_order_tracking(self):
         """선택 순서 유지가 켜져 있는지."""

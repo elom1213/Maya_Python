@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-20
+updated: 2026-11-25
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,16 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-23 (오늘)
+## 2026-11-25 (오늘)
+
+> [!summary] **`A00275_skinTool_V01` v01.48 — Flood 리스트 계층 표시 + `Select in List`** `#A00275_skinTool_V01`
+- 요청 1: Get Bound Joints 로 담은 뒤 씬에서 고른 조인트를 버튼 하나로 TSL 에서 선택 → 이어서 Flood 하기 쉽게.
+  `Select in List` 추가, Flood 는 리스트에서 고른 행이 있으면 그 조인트만(없으면 전부). 같은 이름은 풀패스(UUID)로 구별.
+- 요청 2: Flood TSL 의 조인트를 계층 구조로. 아웃라이너 순서 + 리스트 안 조상 수만큼 `└` 들여쓰기(그릴 때만, 글자 불변), Up/Down/Sort 제거.
+- 공용 TSL: `select_by_nodes` · `arrange(order, depths)` · `node_at` · `DEPTH_ROLE`(name_display 델리게이트가 들여쓰기) · `btn_add` 보관 — 전부 추가만.
+- 시험 `test_flood_ui.py` 53(새 15), TabFit 34 · Move 15 · Classic 12 · `Framework/tests/test_tsl_name_display.py` 28 그대로.
+
+## 2026-11-23
 
 > [!summary] **`A00210_FileManager` v01.58 — Status 탭에도 Scan depth** `#A00210_FileManager`
 - Roots 칸과 같은 공유 설정, 서로 맞춰짐. 시험 `test_sync_depth.py` 22.

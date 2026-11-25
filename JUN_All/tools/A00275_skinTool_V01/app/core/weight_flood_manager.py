@@ -243,6 +243,56 @@ def bound_joints(targets=None, weight_eps=1e-8):
     return out, messages
 
 
+def hierarchy_order(nodes):
+    """노드 목록을 **아웃라이너 계층 순서**로. `(order, depths)` - order 는 입력 인덱스, depths 는 그 순서의 깊이.
+
+    v01.48 - Flood 리스트를 계층으로 보이게. 순서 = 아웃라이너와 같은 깊이 우선(형제는 아웃라이너 순서).
+    깊이 = **목록 안의** 조상 수(목록에 없는 중간 노드는 세지 않는다 - 리스트 안에서 트리로 보이게).
+    씬에 없는 노드는 맨 뒤, 깊이 0. 풀패스로 다뤄 같은 이름도 된다.
+    """
+    full = []
+    for node in nodes or []:
+        try:
+            found = cmds.ls(node, long=True) or []
+        except Exception:                                  # noqa: BLE001
+            found = []
+        full.append(found[0] if len(found) == 1 else None)
+
+    children_cache = {}
+
+    def _children(parent):
+        if parent not in children_cache:
+            if parent is None:
+                kids = cmds.ls(assemblies=True, long=True) or []
+            else:
+                kids = cmds.listRelatives(parent, children=True, fullPath=True) or []
+            children_cache[parent] = {k: i for i, k in enumerate(kids)}
+        return children_cache[parent]
+
+    def _key(path):
+        if not path:
+            return (1, ())
+        parts = path.split("|")[1:]
+        key, parent = [], None
+        for n in range(len(parts)):
+            current = "|" + "|".join(parts[:n + 1])
+            key.append(_children(parent).get(current, len(children_cache[parent])))
+            parent = current
+        return (0, tuple(key))
+
+    order = sorted(range(len(full)), key=lambda i: (_key(full[i]), i))
+    listed = set(p for p in full if p)
+    depths = []
+    for i in order:
+        path = full[i]
+        if not path:
+            depths.append(0)
+            continue
+        parts = path.split("|")[1:]
+        depths.append(sum(1 for n in range(1, len(parts)) if "|" + "|".join(parts[:n]) in listed))
+    return order, depths
+
+
 def skinned_meshes(targets):
     """`parse_selection` 결과 중 skinCluster 가 있는 메시 풀패스 목록(순서 유지, 중복 제거)."""
     out = []
