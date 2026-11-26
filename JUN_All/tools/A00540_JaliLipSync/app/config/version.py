@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-11-26
 # A00540_JaliLipSync - version info
 
 # 01.00  VisemeNet viseme curves (txt from JUN_JALI's VisemeNet Converter) -> keys on a JALI
@@ -24,5 +24,11 @@
 #        A00560_JaliBatch and A00570_JaliReview share it. app/core/*.py re-export the Framework modules; mapping json
 #        files now live in Framework/jali/mappings. No behaviour change.
 
-VERSION = "01.03"
-LAST_UPDATE = "2026-10-26"
+# 01.04  Options split into two tabs: Default (the options above) and Smooth. Smooth (on by default) smooths the
+#        Phonemes / Coartic / JaLi keys over the whole sequence (all clips and holds) before they are set - the same
+#        filter as A00110 animTool > Curve > Filters > Smooth (amount 50, iterations 3, strength 100 %, adjustable;
+#        preset 25 / 50 / 75 / 100, Reset). The filter math moved to Framework/core/curve_smooth.py and A00110 uses it
+#        from there, so both tools give the same numbers. Sequence ends keep their values. Still one undo step.
+
+VERSION = "01.04"
+LAST_UPDATE = "2026-11-26"

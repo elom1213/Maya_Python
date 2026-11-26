@@ -88,6 +88,27 @@ check("U1 default Auto, manual fields disabled", win.rb_auto.isChecked() and not
       and win.cmb_rig.isEnabled())
 check("U1 empty clip table", win.table.rowCount() == 0 and win.lb_info.text() == "No clips")
 
+# U0 v01.04 Options 탭 2개 - Default / Smooth, Smooth 기본 = A00110 Filters 세팅 50 / 3 / 100 %
+check("U0 option tabs Default / Smooth", [win.opt_tabs.tabText(i) for i in range(win.opt_tabs.count())] == ["Default", "Smooth"]
+      and win.opt_tabs.currentIndex() == 0 and win.opt_tabs.widget(0).isAncestorOf(win.sb_start)
+      and win.opt_tabs.widget(1).isAncestorOf(win.sld_smooth))
+check("U0 smooth on by default, 50 / 3 / 100", win.cb_smooth.isChecked() and win.sld_smooth.value() == 50
+      and win.sb_smooth.value() == 50 and win.sb_smooth_iter.value() == 3 and win.sb_smooth_strength.value() == 100
+      and win.smooth_settings() == {"amount": 50.0, "iterations": 3, "strength": 100.0})
+win.sld_smooth.setValue(80); pump()
+check("U0 slider <-> spin box", win.sb_smooth.value() == 80)
+win.smooth_preset_buttons[0].click(); pump()
+check("U0 preset 25", win.sld_smooth.value() == 25 and win.smooth_settings()["amount"] == 25.0)
+win.sb_smooth_iter.setValue(7); win.on_smooth_reset(); pump()
+check("U0 Reset -> 50 / 3 / 100", win.smooth_settings() == {"amount": 50.0, "iterations": 3, "strength": 100.0})
+win.cb_smooth.setChecked(False); pump()
+check("U0 off -> widgets disabled, settings None", not win.sld_smooth.isEnabled() and not win.sb_smooth_iter.isEnabled()
+      and win.smooth_settings() is None)
+win.cb_smooth.setChecked(True); win.sb_smooth.setValue(0); pump()
+check("U0 amount 0 -> None", win.smooth_settings() is None)
+win.on_smooth_reset()
+win.cb_smooth.setChecked(False)   # 아래 U2~U12 는 데이터 그대로(v01.03 동작)를 시험한다. Smooth 는 U13
+
 # U2 매핑 바꾸면 스핀박스 리셋
 win.cmb_mapping.setCurrentText("jali_slider_dummy_in"); pump()
 check("U2 new mapping -> scales 1 / 1, Jaw range 0-1 value 0.6",
@@ -159,8 +180,8 @@ win.rb_jali_fixed.setChecked(True); pump()
 check("U8 fixed -> jali scale disabled, jaw/lip enabled", not win.ds_jali_scale.isEnabled() and win.ds_jaw.isEnabled())
 win.rb_jali_fixed.setChecked(False); win.rb_jali_data.setChecked(True)
 
-# U9 창 크기 (v01.02 클립 표가 들어 1005 / 831 - 1080p 화면에 맞는다)
-check("U9 window height sane", win.sizeHint().height() < 1100 and win.minimumSizeHint().height() < 850)
+# U9 창 크기 (v01.02 클립 표가 들어 1005 / 831, v01.04 Options 탭 바로 1042 / 868 - 1080p 화면에 맞는다)
+check("U9 window height sane", win.sizeHint().height() < 1100 and win.minimumSizeHint().height() < 900)
 
 # ---------------------------------------------------------------- v01.02 여러 클립
 win.rb_auto.setChecked(True)
@@ -212,6 +233,24 @@ win.on_clear_clips(); pump()
 check("U12 Clear", win.table.rowCount() == 0 and win.lb_info.text() == "No clips")
 win.on_apply(); pump()
 check("U12 apply with no clips -> ERROR", "[ERROR] No clips" in log_text(win))
+
+# U13 Smooth 켜고 Apply -> 키 = A00110 Smooth 50 (전 구간), 로그에 smooth 표기
+from Framework.core import curve_smooth   # noqa: E402
+win.add_txt(txt); win.add_txt(txt2); pump()
+win.rb_auto.setChecked(True); win.cb_audio.setChecked(False); win.sb_hold.setValue(6); pump()
+win.on_apply(); pump()
+raw = cmds.keyframe("DUMMY_IN_PHONEMES.AAA", q=True, valueChange=True)
+win.cb_smooth.setChecked(True); win.on_smooth_reset(); pump()
+win.on_apply(); pump()
+sm = cmds.keyframe("DUMMY_IN_PHONEMES.AAA", q=True, valueChange=True)
+check("U13 smooth on -> keys = smooth_values(raw, 50, 3, 100)", len(sm) == len(raw)
+      and all(abs(a - b) < 1e-9 for a, b in zip(sm, curve_smooth.smooth_values(raw, 50, 3, 100))) and sm != raw)
+check("U13 log shows smooth", "smooth 50 / iter 3 / 100 %" in log_text(win))
+win.cb_smooth.setChecked(False); win.on_apply(); pump()
+check("U13 smooth off -> raw again, log 'smooth off'", cmds.keyframe("DUMMY_IN_PHONEMES.AAA", q=True, valueChange=True) == raw
+      and "smooth off" in log_text(win))
+win.opt_tabs.setCurrentIndex(1); pump()
+check("U13 switch to Smooth tab", win.opt_tabs.currentIndex() == 1 and win.sld_smooth.isVisibleTo(win))
 
 print("RESULT", "OK" if all(R) else "%d FAILED" % R.count(False))
 maya.standalone.uninitialize()

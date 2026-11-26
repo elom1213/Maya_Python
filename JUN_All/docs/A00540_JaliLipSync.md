@@ -4,7 +4,7 @@
 txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` 가 만든다(wav → txt, TensorFlow 필요).
 이 툴은 txt · wav 만 읽으므로 마야 안에 TensorFlow 가 없어도 된다.
 
-- **버전**: v01.03 (2026-10-26) — 코어를 `Framework/jali` 로 승격(A00560 · A00570 과 공유, 동작 변화 없음). v01.02 클립 여러 개를 순서대로 한 씬에 (Hold · 합친 wav)
+- **버전**: v01.04 (2026-11-26) — Options 를 `Default` / `Smooth` 탭으로, **Smooth 탭 = 거는 키를 A00110 Curve > Filters > Smooth 와 같은 수식으로 다듬기**(기본 켜짐 · 50). v01.03 (2026-10-26) 코어를 `Framework/jali` 로 승격(A00560 · A00570 과 공유, 동작 변화 없음). v01.02 클립 여러 개를 순서대로 한 씬에 (Hold · 합친 wav)
 - **아키텍처**: (B) in-Maya PySide (`maya.cmds`), 드래그&드롭 셸프 설치
 - **짝**: `JUN_JALI` (https://github.com/elom1213/JUN_JALI) — 설치 · 변환은 `JUN_JALI/docs/0050_converter_guide.md`,
   계획은 `0030_tool_plan.md`, JALI ↔ ARKit 매칭은 `0040_jali_arkit_mapping.md`
@@ -21,7 +21,7 @@ txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` �
 ## 2. 사용
 
 ```
-┌ JALI LipSync v01.02 ─────────────────────────────────────────────────────┐
+┌ JALI LipSync v01.04 ─────────────────────────────────────────────────────┐
 │ Data - clips in timeline order                                            │
 │   # │ Start │ Viseme TXT                    │ Audio WAV            │ Length │
 │   1 │     1 │ 0030_vivian_en_01_f0105_0429  │ …_01_f0105_0429.wav  │ 10.80 s / 259 f │
@@ -34,10 +34,14 @@ txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` �
 │                     Coartic  [                 ] [<< Sel] [x]             │
 │                     JaLi     [                 ] [<< Sel] [x]             │
 │                     Mapping  [jali_slider_dummy_in ▼]                     │
-│ Options Start frame [1]  Hold (frames) [12]  Viseme scale [1.00]          │
-│         JaLi (•) From data  JaLi scale [1.00]  ( ) Fixed Jaw [0.60] Lip [0.60] │
-│         [x] Attach audio  [x] Set playback range                          │
-│         Sequence WAV [<first clip folder>/jali_sequence.wav     ] [...]   │
+│ Options [ Default ][ Smooth ]                                             │
+│  Default: Start frame [1]  Hold (frames) [12]  Viseme scale [1.00]        │
+│           JaLi (•) From data  JaLi scale [1.00]  ( ) Fixed Jaw [0.60] Lip [0.60] │
+│           [x] Attach audio  [x] Set playback range                        │
+│           Sequence WAV [<first clip folder>/jali_sequence.wav   ] [...]   │
+│  Smooth:  [x] Smooth the keys on Apply (A00110 Curve > Filters > Smooth) [Reset] │
+│           Amount ━━━━━━━━━●━━━━━━━━━ [50]                                 │
+│                  [25][50][75][100]  Iterations [3]  Strength [100 %]      │
 │ [ Apply ]  [ Remove Keys ]  [ Select Controls ]                           │
 │ Log                                                                        │
 └────────────────────────────────────────────────────────────────────────────┘
@@ -69,6 +73,23 @@ txt 는 짝 저장소 **`JUN_JALI`** 의 스탠드얼론 `VisemeNet Converter` �
 | `JaLi Fixed` | JaLi 노드를 구간 처음 · 끝에 고정값으로만 키(리그 단위 — 범위 · 기본값은 규칙: angela 0~15 · 9, 슬라이더 0~1 · 0.6) — 비짐 타이밍은 데이터, 말투는 사람이 정한다 |
 | `Attach audio` | 사운드 노드 `jali_lipsync_audio` 를 만들어 첫 클립 시작에 놓는다 (다시 Apply 하면 교체). 모든 클립 wav 는 샘플레이트 · 채널 · 비트가 같아야 합쳐진다(변환기 출력은 전부 44.1 kHz 모노 16-bit) |
 | `Set playback range` | 타임라인을 결과 길이로 |
+
+**`Smooth` 탭 (v01.04)** — Apply 로 거는 Phonemes · Coartic · JaLi 키를 **A00110 animTool > Curve > Filters > Smooth 와 같은 수식**
+(`Framework/core/curve_smooth.py`, A00110 도 여기서 가져다 쓴다 → 숫자까지 같다)으로 다듬은 뒤 건다.
+
+| 옵션 | 뜻 |
+|------|-----|
+| `Smooth the keys on Apply` | 켜짐(기본) = 다듬어 건다. 끄면 v01.03 처럼 데이터 그대로 |
+| `Amount` (슬라이더 · 칸 · 25/50/75/100) | 0 ~ 100. 기본 **50** = A00110 Filters 의 원클릭 `50` 버튼과 같다. 0 이면 끈 것과 같다 |
+| `Iterations` | 가우시안 [1 2 1]/4 패스 수(기본 3, A00110 과 같음). 클수록 넓게 뭉갠다 |
+| `Strength` | Amount 에 곱하는 전체 세기(기본 100 %) |
+| `Reset` | A00110 기본 세팅(50 · 3 · 100 %)으로 |
+
+- **어트리뷰트마다 시퀀스 전체**(모든 클립 + Hold 키)의 키 값을 한 줄로 보고 한 번 다듬는다 — A00110 에서 전 구간을 잡고 Smooth 50 을 누른 것과 같다.
+  키 시점 · 개수는 그대로, 시퀀스 **첫 키 · 마지막 키 값은 고정**. 전체가 여전히 Undo 한 번.
+- 클립 경계도 다듬어지므로 **Hold 구간이 완전히 평평하지는 않다**(Hold 키가 다음 클립 첫 값 쪽으로 조금 당겨진다). 딱 붙든 정지가 필요하면 Smooth 를 끈다.
+- `JaLi Fixed` 는 클립마다 처음 · 끝 키뿐이라 값이 같으면 변화가 없다.
+- 로그 `[DONE] … (… keys, JaLi from data x 1, smooth 50 / iter 3 / 100 %)` — 끄면 `smooth off`.
 
 - **다시 Apply 해도 섞이지 않는다** — 전체 구간(첫 클립 시작 ~ 마지막 클립 끝)의 기존 키를 지우고 건다. **클립이 몇 개든 전체가 Undo 한 번.**
 - `Remove Keys` = 매핑 어트리뷰트의 키를 표의 전체 구간에서 지운다(클립이 없으면 전부). `Select Controls` = 규칙의 컨트롤 선택. Manual 이면 채운 노드만.
@@ -119,13 +140,14 @@ A00540_JaliLipSync/
 ├── __init__.py · launch.py · __dragDrop_A00540.py
 ├── app/config/version.py
 ├── app/core/              v01.03: 다섯 모듈 전부 Framework/jali 재노출(얇은 파일) - 본체는 아래
-├── app/ui/main_window.py  클립 표(QTableWidget) + Target + Options  (from Framework.jali import ...)
+├── app/ui/main_window.py  클립 표(QTableWidget) + Target + Options 탭(Default / Smooth)  (from Framework.jali import ...)
+├── (공용) JUN_All/Framework/core/curve_smooth.py   v01.04: A00110 Curve > Filters > Smooth 수식(gaussian_smooth · smooth_values) - A00110 도 여기서 import
 ├── (공용) JUN_All/Framework/jali/        A00540 · A00560_JaliBatch · A00570_JaliReview 가 같이 쓴다 - docs/Framework_jali.md
 │   ├── lipsync_data.py   txt(22열) + json 읽기 · 검증, find_wav(), wav_seconds()   (Maya 비의존)
 │   ├── mapping.py        mappings/*.json 읽기 · 검증(nodes 역할표 · 배율 기본값 채움), combine()   (Maya 비의존)
 │   ├── sequence.py       Clip(txt + wav) · load_clip · layout(clips, start, hold, fps) -> [Segment] · write_sequence_wav()   (Maya 비의존)
 │   ├── keyer.py          resolve_targets(Auto 네임스페이스 / Manual node_map) · sample · check_targets · scale_warnings
-│   │                     · apply_sequence(segments, hold) · apply(클립 하나) · remove · controls (undo_chunk)
+│   │                     · apply_sequence(segments, hold, smooth) · apply(클립 하나) · remove · controls (undo_chunk)
 │   ├── scene.py          marker_of(mapping) · find_rigs(marker), attach_sound()
 │   ├── bake.py · clip_stamp.py   (A00560 · A00570 용 - 베이크 · 도장)
 │   └── mappings/angela_jali_visemenet.json · jali_slider_dummy_in.json
@@ -148,3 +170,8 @@ Apply · Fixed · Select · Remove · 나쁜 txt). **마야 GUI 에서 드롭 �
 **확인 기록 (2026-10-22, v01.02, `tests/run_all.py` 132항목)**: 매핑 21 · **클립 이어 붙이기 17**(wav 자동/명시/없음 · layout 간격 · hold · 30 fps 부동소수점 · 합친 wav 의 샘플 위치 · 형식 다름 · 원본 덮기 거부) ·
 코어 33(+11: hold 5 키 수 · 정지 구간 값 유지 · 클립별 Jaw · **Undo 한 번에 전체** · hold 0 · Fixed 여러 클립 · 재적용 정리 · 빈 목록) · 오프스크린 UI 36(+18: 표 Start 열이 Start frame · Hold 를 따름 · Up/Down · 클립별 로그 · 합친 wav 생성 + 사운드 노드 오프셋 · 재생 범위 · Remove Keys 전체 구간 · No WAV · Remove · Clear) ·
 실제 파일 25(+7: `out_en_002` 의 변환기 출력 5 클립 + `A0020_jali_slider_ctl.ma`, hold 12 — 구간 = wav 길이, 2번 클립 키 값 = 그 txt 줄, 정지 구간 유지, 합친 wav 31.10 s, 사운드 노드). **마야 GUI 미확인.**
+
+**확인 기록 (2026-11-26, v01.04, `tests/run_all.py` 전부 통과)**: 코어 +8(K14 `smooth=None` 은 예전 그대로 · smooth 50 = 전 구간 원래 값에 `curve_smooth.smooth_values` ·
+JaLi 역할도 · 키 시점/개수 불변 · 양 끝 고정 · hold 키가 두 클립 값 사이로 · 빠진 키는 A00110 기본 · Undo 한 번, K15 A00110 의 `smooth_values` 가 같은 함수) ·
+오프스크린 UI +11(U0 탭 Default/Smooth · 기본 켜짐 50/3/100 · 슬라이더↔칸 · 프리셋 · Reset · 끄면 비활성 · Amount 0 = 끔, U13 Apply 키 = smooth_values(원래 값) · 로그 · 끄면 원래 값).
+U2~U12 는 Smooth 를 끈 채 v01.03 동작을 시험. 창 최소 높이 831 → 868(오프스크린, 탭 바) — U9 한계 900. A00110 Filters Smooth 가 Framework 함수로 같은 값을 내는 것도 mayapy 로 확인. **마야 GUI 미확인.**

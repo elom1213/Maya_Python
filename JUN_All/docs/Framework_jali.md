@@ -11,7 +11,7 @@ Framework 에 두어야 세 툴의 릴리즈에 모두 동봉된다. A00540 의 
 | `sequence.py` | 순수 파이썬 | `Clip` · `layout(clips, start, hold, fps)` → `[Segment]`(클립 길이는 wav) · `write_sequence_wav()` |
 | `time_units.py` | 순수 파이썬 | fps ↔ 마야 시간 단위 이름 (`30 = ntsc`) — standalone 과 in-Maya 가 같은 표 |
 | `clip_manifest.py` | 순수 파이썬 | 클립 폴더의 `jali_clips.manifest.json` (A00560 이 쓰고 A00570 이 읽는다): 설정 + 클립마다 start · end · frames · status(generated / edited / failed) |
-| `keyer.py` | maya.cmds | `resolve_targets`(Auto 네임스페이스 / Manual node_map) · `sample` · `check_targets` · `apply_sequence` · `apply` · `remove` (undo 한 번) |
+| `keyer.py` | maya.cmds | `resolve_targets`(Auto 네임스페이스 / Manual node_map) · `sample` · `check_targets` · `apply_sequence`(2026-11-26 `smooth=` 추가 - None 이 기본이라 A00560 · A00570 무변, A00540 Smooth 탭이 씀 → `Framework/core/curve_smooth.py`) · `apply` · `remove` (undo 한 번) |
 | `scene.py` | maya.cmds | `marker_of(mapping)` · `find_rigs()` · `attach_sound()` |
 | `bake.py` | maya.cmds | JUN_JALI `bake_ctl_keys` 이식 — DUMMY_IN 의 키를 컨트롤러 채널로 복사(`copy`) 또는 `bakeResults`, `cleanup_dummy_in()` · `rename_curves()`(`JALI_<ctl>_<attr>`) · `baked_channels()` (레퍼런스된 컨트롤러에서도 동작) |
 | `clip_stamp.py` | 파싱은 순수 / 쓰기 · 읽기는 cmds | 클립 `.mb` 의 fileInfo `jun_jali_clip`(컨트롤러 경로 · mtime · 매핑 · fps · start · end · frames · keys · 시각 · 툴), `controller_changed()` |

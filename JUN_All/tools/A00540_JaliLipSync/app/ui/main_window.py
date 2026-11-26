@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-11-26
 # A00540_JaliLipSync - Qt UI (in-Maya)
 #
 # JUN_JALI 의 VisemeNet Converter 가 만든 txt(+json) 와 음성 wav 를 골라 JALI 리그에 키를 건다.
@@ -11,6 +11,8 @@
 #   Options : 시작 프레임 · Hold(클립 사이 정지 프레임) · 비짐 배율 · JaLi(데이터 + JaLi 배율 / 고정 Jaw Lip)
 #             · 오디오 붙이기(클립이 여럿이면 wav 하나로 합쳐 Sequence WAV 경로에 쓴다) · 재생 범위
 #             배율 · Fixed 범위의 기본값은 매핑 json 이 정하고, 매핑을 바꾸면 스핀박스가 리셋된다.
+#             v01.04 Options 를 탭 2개로 - Default(위 옵션 그대로) / Smooth(Apply 로 거는 Phonemes · Coartic · JaLi 키를
+#             A00110 Curve > Filters > Smooth 와 같은 수식으로 다듬어 건다. 기본 켜짐 · 50 · Iterations 3 · Strength 100 %).
 #   Apply / Remove Keys / Select Controls + 로그
 # 모든 UI 문자열 · 로그는 영어. 계획: JUN_JALI/docs/0030_tool_plan.md §5, docs/plans/A00540_JaliLipSync_v0101_rules_manual_plan.md
 
@@ -23,7 +25,9 @@ from Framework.qt.qt import *
 from Framework.qt.maya_window import maya_main_window
 from Framework.qt.MOD_log_qt_v01 import JUN_mod_log_qt_v01
 from Framework.qt.MOD_menuBar_qt_v01 import JUN_mod_menuBar_qt_v01
-from Framework.core import file_opener
+from Framework.qt.MOD_sliderStyle_qt_v01 import JUN_mod_sliderStyle_qt_v01
+from Framework.qt.MOD_tabFit_qt_v01 import JUN_mod_tabFit_qt_v01
+from Framework.core import file_opener, curve_smooth
 
 from tools.A00540_JaliLipSync.app.config.version import VERSION, LAST_UPDATE
 from Framework.jali import lipsync_data, mapping as mapping_mod, keyer, scene, sequence   # v01.03: 공용 코어
@@ -36,6 +40,7 @@ GUIDE_DOC = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path
 ROLE_LABELS = (("phonemes", "Phonemes"), ("coartic", "Coartic"), ("jali", "JaLi"))
 COLUMNS = ("#", "Start", "Viseme TXT", "Audio WAV", "Length")
 COL_NUM, COL_START, COL_TXT, COL_WAV, COL_LEN = range(5)
+SMOOTH_PRESETS = (25, 50, 75, 100)
 
 
 def _natural_key(path):
@@ -169,9 +174,14 @@ class MainWindow(QWidget):
         tgrid.setColumnStretch(2, 1)
         layout.addWidget(tgt_box)
 
-        # --- Options
+        # --- Options (v01.04: Default / Smooth 탭)
         opt_box = QGroupBox("Options")
-        ogrid = QGridLayout(opt_box)
+        opt_layout = QVBoxLayout(opt_box)
+        opt_layout.setContentsMargins(4, 4, 4, 4)            # 탭 바가 차지한 높이를 여백에서 덜어 낸다
+        self.opt_tabs = QTabWidget()
+        opt_layout.addWidget(self.opt_tabs)
+        default_page = QWidget()
+        ogrid = QGridLayout(default_page)
         self.sb_start = QSpinBox()
         self.sb_start.setRange(-100000, 100000)
         self.sb_start.setValue(1)
@@ -247,6 +257,8 @@ class MainWindow(QWidget):
         ogrid.addWidget(QLabel("Sequence WAV"), 3, 0)
         ogrid.addWidget(self.le_seq_wav, 3, 1, 1, 2)
         ogrid.addWidget(btn_seq, 3, 3)
+        self.opt_tabs.addTab(default_page, "Default")
+        self.opt_tabs.addTab(self._build_smooth_page(), "Smooth")
         layout.addWidget(opt_box)
 
         # --- 버튼
@@ -274,6 +286,101 @@ class MainWindow(QWidget):
 
         self._on_mode_changed()
         self._on_jali_mode_changed()
+        self._on_smooth_toggled()
+        self.slider_style = JUN_mod_sliderStyle_qt_v01(self)
+        self.tab_fit = JUN_mod_tabFit_qt_v01(self, self.opt_tabs)
+
+    def _build_smooth_page(self):
+        """Smooth 탭 - Apply 로 거는 키를 A00110 Curve > Filters > Smooth 와 같은 수식으로 다듬는다.
+
+        창 높이가 늘지 않게 Default 탭(4줄)보다 짧은 3줄로 둔다 - 켜기 · Reset / Amount / 프리셋 · Iterations · Strength.
+        """
+        page = QWidget()
+        page.setToolTip("Same filter as A00110 animTool > Curve > Filters > Smooth, applied to every key of the\n"
+                        "sequence (all clips and holds) of each Phonemes / Coartic / JaLi attribute.")
+        grid = QGridLayout(page)
+
+        self.cb_smooth = QCheckBox("Smooth the keys on Apply (A00110 Curve > Filters > Smooth)")
+        self.cb_smooth.setChecked(True)
+        self.cb_smooth.setToolTip(
+            "On (default): the Phonemes / Coartic / JaLi keys are smoothed over the whole sequence before\n"
+            "they are set - the same filter as A00110 animTool > Curve > Filters > Smooth.\n"
+            "The first and last key of the sequence keep their values.\n"
+            "Off: the keys follow the model data exactly.")
+        self.cb_smooth.toggled.connect(self._on_smooth_toggled)
+        self.btn_smooth_reset = QPushButton("Reset")
+        self.btn_smooth_reset.setToolTip("Back to the A00110 Filters setting: amount {0:g}, iterations {1}, "
+                                         "strength {2:g} %".format(curve_smooth.DEFAULT_AMOUNT,
+                                                                    curve_smooth.DEFAULT_ITERATIONS,
+                                                                    curve_smooth.DEFAULT_STRENGTH))
+        self.btn_smooth_reset.clicked.connect(self.on_smooth_reset)
+        grid.addWidget(self.cb_smooth, 0, 0, 1, 2)
+        grid.addWidget(self.btn_smooth_reset, 0, 2)
+
+        self.sld_smooth = QSlider(Qt.Horizontal)
+        self.sld_smooth.setRange(0, 100)
+        self.sld_smooth.setValue(int(curve_smooth.DEFAULT_AMOUNT))
+        self.sld_smooth.setToolTip("How much to smooth. 0 = none, 100 = fully smoothed (A00110 Smooth slider).")
+        self.sb_smooth = QSpinBox()
+        self.sb_smooth.setRange(0, 100)
+        self.sb_smooth.setValue(int(curve_smooth.DEFAULT_AMOUNT))
+        self.sb_smooth.setKeyboardTracking(False)
+        self.sb_smooth.setFixedWidth(64)
+        self.sld_smooth.valueChanged.connect(self.sb_smooth.setValue)
+        self.sb_smooth.valueChanged.connect(self.sld_smooth.setValue)
+        grid.addWidget(QLabel("Amount"), 1, 0)
+        grid.addWidget(self.sld_smooth, 1, 1)
+        grid.addWidget(self.sb_smooth, 1, 2)
+
+        row = QHBoxLayout()
+        self.smooth_preset_buttons = []
+        for amount in SMOOTH_PRESETS:
+            btn = QPushButton(str(amount))
+            btn.setToolTip("Amount {0}".format(amount))
+            btn.clicked.connect(lambda _=False, a=amount: self.sb_smooth.setValue(a))
+            row.addWidget(btn)
+            self.smooth_preset_buttons.append(btn)
+        row.addSpacing(12)
+        self.sb_smooth_iter = QSpinBox()
+        self.sb_smooth_iter.setRange(1, 20)
+        self.sb_smooth_iter.setValue(curve_smooth.DEFAULT_ITERATIONS)
+        self.sb_smooth_iter.setKeyboardTracking(False)
+        self.sb_smooth_iter.setToolTip("How many smoothing passes. More passes reach further along the curve.")
+        self.sb_smooth_strength = QSpinBox()
+        self.sb_smooth_strength.setRange(0, 100)
+        self.sb_smooth_strength.setValue(int(curve_smooth.DEFAULT_STRENGTH))
+        self.sb_smooth_strength.setSuffix(" %")
+        self.sb_smooth_strength.setKeyboardTracking(False)
+        self.sb_smooth_strength.setToolTip("Overall scale on the amount. 100% = the amount means what it says.")
+        row.addWidget(QLabel("Iterations"))
+        row.addWidget(self.sb_smooth_iter)
+        row.addWidget(QLabel("Strength"))
+        row.addWidget(self.sb_smooth_strength)
+        row.addStretch(1)
+        grid.addLayout(row, 2, 1, 1, 2)
+        grid.setColumnStretch(1, 1)
+        grid.setRowStretch(3, 1)
+
+        self.smooth_widgets = [self.sld_smooth, self.sb_smooth, self.sb_smooth_iter, self.sb_smooth_strength,
+                               self.btn_smooth_reset] + self.smooth_preset_buttons
+        return page
+
+    def _on_smooth_toggled(self, *args):
+        on = self.cb_smooth.isChecked()
+        for w in self.smooth_widgets:
+            w.setEnabled(on)
+
+    def on_smooth_reset(self, *args):
+        self.sb_smooth.setValue(int(curve_smooth.DEFAULT_AMOUNT))
+        self.sb_smooth_iter.setValue(curve_smooth.DEFAULT_ITERATIONS)
+        self.sb_smooth_strength.setValue(int(curve_smooth.DEFAULT_STRENGTH))
+
+    def smooth_settings(self):
+        """Smooth 탭 설정 dict (keyer.apply_sequence 의 smooth 인자). 꺼져 있거나 세기가 0 이면 None."""
+        if not self.cb_smooth.isChecked() or self.sb_smooth.value() == 0 or self.sb_smooth_strength.value() == 0:
+            return None
+        return {"amount": float(self.sb_smooth.value()), "iterations": self.sb_smooth_iter.value(),
+                "strength": float(self.sb_smooth_strength.value())}
 
     # ------------------------------------------------------------------ 도우미
 
@@ -531,11 +638,12 @@ class MainWindow(QWidget):
                                                     self.ds_jali_scale.value()):
             self._log("[WARN] {0}: scale {1:g} exceeds the attribute maximum {2:g}".format(attr, scale, mx))
 
+        smooth = self.smooth_settings()
         QApplication.setOverrideCursor(Qt.WaitCursor)
         try:
             res = keyer.apply_sequence(segments, mapping, ns, viseme_scale=self.ds_scale.value(),
                                        jali_scale=self.ds_jali_scale.value(), jali_fixed=jali, node_map=node_map,
-                                       hold=hold)
+                                       hold=hold, smooth=smooth)
             for i, (label, s, e) in enumerate(res["clips"]):
                 self._log("[OK] {0}/{1} {2}: frames {3}-{4}".format(i + 1, len(res["clips"]), label, s, e))
             if self.cb_range.isChecked():
@@ -552,11 +660,12 @@ class MainWindow(QWidget):
             QApplication.restoreOverrideCursor()
 
         self._log("[DONE] {0} attributes keyed on '{1}': {2} clip(s), frames {3}-{4} @ {5:g} fps, hold {6} "
-                  "({7} keys, JaLi {8}){9}".format(
+                  "({7} keys, JaLi {8}, smooth {10}){9}".format(
                       res["attrs"], self._target_desc(node_map), len(res["clips"]), res["start"], res["end"],
                       res["fps"], hold, res["keys"],
                       "fixed {0:g} / {1:g}".format(*jali) if jali else "from data x {0:g}".format(self.ds_jali_scale.value()),
-                      ", skipped: {0}".format(", ".join(res["skipped"])) if res["skipped"] else ""))
+                      ", skipped: {0}".format(", ".join(res["skipped"])) if res["skipped"] else "",
+                      "{amount:g} / iter {iterations} / {strength:g} %".format(**smooth) if smooth else "off"))
         self._log("[INFO] The model output ends about 0.32 s before each clip's audio (VisemeNet limit).")
 
     def _attach_audio(self, segments):
@@ -625,7 +734,9 @@ class MainWindow(QWidget):
             "3. Hold = frames of pause between clips (last pose held).\n"
             "4. Target: Auto finds the rig by name, Manual lets you pick\n"
             "   the Phonemes / Coartic / JaLi nodes (empty = skipped).\n"
-            "5. Apply (one undo step). Several clips -> one sequence WAV.\n\n"
+            "5. Smooth tab: the keys are smoothed like A00110 Curve > Filters\n"
+            "   > Smooth (on by default, amount 50).\n"
+            "6. Apply (one undo step). Several clips -> one sequence WAV.\n\n"
             "Keys are sampled at the scene fps. Re-applying clears the range first.\n"
             "Scales and the Fixed range reset to the mapping's defaults.\n"
             "New rigs = a new json in Framework/jali/mappings.\n\n"

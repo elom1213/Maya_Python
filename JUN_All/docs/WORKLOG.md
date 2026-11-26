@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-25
+updated: 2026-11-26
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,18 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-25 (오늘)
+## 2026-11-26 (오늘)
+
+> [!summary] **`A00540_JaliLipSync` v01.04 — Options 탭 Default / Smooth : 키를 A00110 Filters Smooth 로 다듬어 건다** `#A00540_JaliLipSync`
+- 요청: Apply 로 거는 Phonemes · Coartic · JaLi 키가 모든 구간에서 A00110 Curve > Filters > Smooth 를 준 상태로 들어가게, 기본 50 · 정도 조절 가능,
+  Options 를 탭 2개로(지금 UI = Default, 새 Smooth 탭).
+- A00110 의 Smooth 수식(`gaussian_smooth` · `mix` · `smooth_values`)을 `Framework/core/curve_smooth.py` 로 올림 — 릴리즈본은 툴 간 import 금지라 공용으로,
+  A00110 `curve_filter_manager` 는 거기서 import(이름 · 동작 그대로, mayapy 로 같은 값 확인).
+- `Framework.jali.keyer.apply_sequence(smooth=...)` — 키 값을 어트리뷰트마다 전 구간(클립 + hold)에서 모은 뒤 한 번 Smooth 하고 건다. None 기본이라 A00560 · A00570 무변.
+- Smooth 탭: 켜기(기본 켜짐) · Amount 슬라이더 + 칸(기본 50) · 25/50/75/100 · Iterations 3 · Strength 100 % · Reset. 공용 sliderStyle · tabFit 붙임.
+- 시험 `tests/run_all.py` 전부 통과(코어 +8 · UI +11), 창 최소 높이 831 → 868(오프스크린).
+
+## 2026-11-25
 
 > [!summary] **`A00600_SceneCleanup` v01.01 — 항목 `Delete all namespaces`** `#A00600_SceneCleanup`
 - 요청: 씬의 모든 네임스페이스 지우기 규칙. 노드는 남기고 루트로 옮긴다(`removeNamespace` + `mergeNamespaceWithRoot`), 창을 열 때 체크.

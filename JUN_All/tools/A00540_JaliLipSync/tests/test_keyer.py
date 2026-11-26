@@ -171,6 +171,42 @@ try:
 except keyer.KeyingError:
     check("K13 hold -1 -> KeyingError", True)
 
+# ---------------------------------------------------------------- v01.04 Smooth
+from Framework.core import curve_smooth   # noqa: E402
+
+# K14 smooth=None 은 예전과 같고, smooth 를 주면 어트리뷰트마다 전 구간 키 값 = curve_smooth.smooth_values(전 구간 원래 값)
+segs = sequence.layout(clips, 1, 5, 24.0)
+res = keyer.apply_sequence(segs, new, "rigA:", hold=5)
+raw_aaa = cmds.keyframe(AAA, q=True, valueChange=True)
+raw_jaw = cmds.keyframe(JAW, q=True, valueChange=True)
+raw_t = cmds.keyframe(AAA, q=True, tc=True)
+check("K14 smooth=None -> result smooth None, raw step 0.7 -> 0.2", res["smooth"] is None and raw_aaa[0] == 0.7 and raw_aaa[-1] == 0.2)
+cmds.undoInfo(state=True, infinity=True)
+res = keyer.apply_sequence(segs, new, "rigA:", hold=5, smooth={"amount": 50, "iterations": 3, "strength": 100})
+sm_aaa = cmds.keyframe(AAA, q=True, valueChange=True)
+sm_jaw = cmds.keyframe(JAW, q=True, valueChange=True)
+exp_aaa = curve_smooth.smooth_values(raw_aaa, 50, 3, 100)
+exp_jaw = curve_smooth.smooth_values(raw_jaw, 50, 3, 100)
+check("K14 same key times, same key count", cmds.keyframe(AAA, q=True, tc=True) == raw_t and len(sm_aaa) == len(raw_aaa) == 22)
+check("K14 AAA = A00110 Smooth 50 over the whole sequence",
+      all(abs(a - b) < 1e-9 for a, b in zip(sm_aaa, exp_aaa)))
+check("K14 JaLi role smoothed too", all(abs(a - b) < 1e-9 for a, b in zip(sm_jaw, exp_jaw)) and sm_jaw != raw_jaw)
+check("K14 boundary softened (hold key 18 between 0.2 and 0.7), ends fixed",
+      0.2 < value_at(AAA, 18) < 0.7 and sm_aaa[0] == raw_aaa[0] and sm_aaa[-1] == raw_aaa[-1])
+check("K14 result reports smooth", res["smooth"] == {"amount": 50, "iterations": 3, "strength": 100})
+res = keyer.apply_sequence(segs, new, "rigA:", hold=5, smooth={"amount": 100})
+check("K14 missing keys -> A00110 defaults (iter 3, strength 100)",
+      all(abs(a - b) < 1e-9 for a, b in zip(cmds.keyframe(AAA, q=True, valueChange=True),
+                                            curve_smooth.smooth_values(raw_aaa, 100, 3, 100))))
+cmds.undo()
+check("K14 smooth apply is one undo step (back to the smooth 50 keys)",
+      all(abs(a - b) < 1e-9 for a, b in zip(cmds.keyframe(AAA, q=True, valueChange=True), exp_aaa)))
+
+# K15 A00110 Curve > Filters 가 같은 함수를 쓴다 (수치 동일 보장)
+from tools.A00110_animTool_V02.app.core import curve_filter_manager as cfm   # noqa: E402
+check("K15 A00110 smooth_values is Framework.core.curve_smooth.smooth_values",
+      cfm.smooth_values is curve_smooth.smooth_values and cfm.gaussian_smooth is curve_smooth.gaussian_smooth)
+
 print("RESULT", "OK" if all(R) else "%d FAILED" % R.count(False))
 maya.standalone.uninitialize()
 sys.exit(0 if all(R) else 1)

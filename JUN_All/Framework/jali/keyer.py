@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-10-26
+# last Update date : 2026-11-26
 # Framework.jali.keyer - JALI 리그에 키 걸기 / 지우기 (maya.cmds, UI 비의존)
 #
 # 2026-10-26 A00540_JaliLipSync/app/core/keyer.py 를 공용(Framework/jali)으로 올렸다 - A00560_JaliBatch 워커 ·
@@ -18,10 +18,13 @@
 # v01.02 여러 클립은 apply_sequence() - sequence.layout() 이 놓은 Segment 들을 한 Undo 로 건다. 클립 사이 hold 프레임은
 #   클립 끝 값을 다음 클립 직전까지 키로 붙들어 정지 구간으로 만든다(안 붙들면 마야가 두 클립 사이를 천천히 보간한다).
 #   apply() 는 클립 하나짜리 apply_sequence().
+# v01.04 (A00540) apply_sequence(smooth=...) - 걸 키 값을 어트리뷰트마다 전 구간에서 모은 뒤 A00110 Curve > Filters > Smooth 와
+#   같은 수식(Framework/core/curve_smooth.py)으로 다듬고 건다. smooth=None(기본)이면 예전과 같다 - A00560 · A00570 무변.
 
 import maya.cmds as cmds
 
 from Framework.core.maya_undo import undo_chunk
+from Framework.core import curve_smooth
 
 from . import mapping as mapping_mod
 from . import sequence
@@ -156,7 +159,7 @@ def sample(data, mapping, fps, viseme_scale=None, jali_scale=None, targets=None)
 
 
 def apply_sequence(segments, mapping, namespace="", viseme_scale=None, jali_scale=None, jali_fixed=None,
-                   node_map=None, hold=0, progress=None):
+                   node_map=None, hold=0, progress=None, smooth=None):
     """여러 클립(sequence.layout 의 Segment 목록)을 순서대로 건다. 전체가 Undo 한 번.
 
     Args:
@@ -165,9 +168,11 @@ def apply_sequence(segments, mapping, namespace="", viseme_scale=None, jali_scal
         node_map: Manual 모드 역할 -> 노드. None = Auto (namespace 사용).
         hold: 클립 사이 정지 프레임 수. 0 보다 크면 클립 끝 값을 end + hold 프레임에 한 번 더 키로 붙든다(마지막 클립 제외).
         progress: progress(done, total, message) 또는 None.
+        smooth: None = 그대로(기본). {"amount", "iterations", "strength"} = A00110 Curve > Filters > Smooth 를
+            어트리뷰트마다 전 구간 키 값에 적용한 뒤 건다(빠진 키는 A00110 기본 50 / 3 / 100 %).
 
     Returns:
-        dict(start, end, fps, keys, attrs, skipped, clips=[(label, start, end)])
+        dict(start, end, fps, keys, attrs, skipped, clips=[(label, start, end)], smooth=dict 또는 None)
     """
     if not segments:
         raise KeyingError("No clip - add at least one TXT")
@@ -190,34 +195,51 @@ def apply_sequence(segments, mapping, namespace="", viseme_scale=None, jali_scal
     keys = 0
     clips = []
 
+    # 1) 어트리뷰트마다 (프레임, 값) 목록을 전 구간에 걸쳐 모은다. chunks = 키를 거는 순서(클립 -> 타겟)와 그 몫.
+    plan = {t["attr"]: [] for t in targets}
+    chunks = []
+    for si, seg in enumerate(segments):
+        values, n_frames = sample(seg.data, mapping, fps, viseme_scale, jali_scale, targets)
+        hold_frame = seg.end + hold if (hold > 0 and si < len(segments) - 1) else None
+        jali_iter = iter(jali_fixed) if jali_fixed else None
+        for t in targets:
+            attr = t["attr"]
+            keys_of = plan[attr]
+            begin = len(keys_of)
+            if jali_iter is not None and t["role"] == mapping_mod.JALI_ROLE:
+                last_value = float(next(jali_iter, fixed_default[0]))
+                keys_of += [(seg.start, last_value), (seg.start + n_frames, last_value)]
+            else:
+                keys_of += [(seg.start + f, v) for f, v in enumerate(values[attr])]
+                last_value = values[attr][-1]
+            if hold_frame is not None:
+                keys_of.append((hold_frame, last_value))
+            chunks.append((seg.label, attr, begin, len(keys_of)))
+        clips.append((seg.label, seg.start, seg.end))
+
+    # 2) v01.04 Smooth - A00110 Curve > Filters > Smooth 와 같은 수식(Framework.core.curve_smooth)을 어트리뷰트마다
+    #    **전 구간(모든 클립 + hold)의 키 값** 에 한 번 적용한다. 시퀀스 양 끝 키는 고정된다.
+    if smooth:
+        amount = float(smooth.get("amount", curve_smooth.DEFAULT_AMOUNT))
+        iterations = int(smooth.get("iterations", curve_smooth.DEFAULT_ITERATIONS))
+        strength = float(smooth.get("strength", curve_smooth.DEFAULT_STRENGTH))
+        for attr, keys_of in plan.items():
+            smoothed = curve_smooth.smooth_values([v for _, v in keys_of], amount, iterations, strength)
+            plan[attr] = [(f, v) for (f, _), v in zip(keys_of, smoothed)]
+
+    # 3) 건다 (전체가 Undo 한 번)
     with undo_chunk():
         for t in targets:
             cmds.cutKey(t["attr"], time=(first, last), clear=True)
-        for si, seg in enumerate(segments):
-            values, n_frames = sample(seg.data, mapping, fps, viseme_scale, jali_scale, targets)
-            hold_frame = seg.end + hold if (hold > 0 and si < len(segments) - 1) else None
-            jali_iter = iter(jali_fixed) if jali_fixed else None
-            for t in targets:
-                attr = t["attr"]
-                if jali_iter is not None and t["role"] == mapping_mod.JALI_ROLE:
-                    last_value = float(next(jali_iter, fixed_default[0]))
-                    for frame in (seg.start, seg.start + n_frames):
-                        cmds.setKeyframe(attr, time=frame, value=last_value)
-                    keys += 2
-                else:
-                    for f, v in enumerate(values[attr]):
-                        cmds.setKeyframe(attr, time=seg.start + f, value=v)
-                    keys += len(values[attr])
-                    last_value = values[attr][-1]
-                if hold_frame is not None:
-                    cmds.setKeyframe(attr, time=hold_frame, value=last_value)
-                    keys += 1
-                done += 1
-                if progress:
-                    progress(done, total, "{0}: {1}".format(seg.label, attr))
-            clips.append((seg.label, seg.start, seg.end))
+        for label, attr, begin, end in chunks:
+            for frame, value in plan[attr][begin:end]:
+                cmds.setKeyframe(attr, time=frame, value=value)
+            keys += end - begin
+            done += 1
+            if progress:
+                progress(done, total, "{0}: {1}".format(label, attr))
     return {"start": first, "end": last, "fps": fps, "keys": keys, "attrs": len(targets), "skipped": skipped,
-            "clips": clips}
+            "clips": clips, "smooth": dict(smooth) if smooth else None}
 
 
 def apply(data, mapping, namespace="", start=1, viseme_scale=None, jali_scale=None, jali_fixed=None,

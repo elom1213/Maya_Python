@@ -79,38 +79,9 @@ def _undo_disabled():
 
 # ============================================================ 순수 계산 (마야 무관)
 
-def gaussian_smooth(values, iterations=1):
-    """[1 2 1]/4 커널을 `iterations` 번 돌린 값 목록. 양 끝 값은 고정한다.
-
-    양 끝을 고정하는 이유: 구간 밖 애니메이션과 이어지는 지점이라 값이 움직이면
-    경계에 이음매가 생긴다.
-    """
-    out = list(values)
-    if len(out) < 3:
-        return out
-    for _ in range(max(0, int(iterations))):
-        prev = list(out)
-        for i in range(1, len(prev) - 1):
-            out[i] = (prev[i - 1] + 2.0 * prev[i] + prev[i + 1]) * 0.25
-    return out
-
-
-def mix(original, target, t):
-    """original 에서 target 쪽으로 t 만큼. t<0 이면 **반대로** 밀어낸다(요철 강조)."""
-    return [o + (g - o) * t for o, g in zip(original, target)]
-
-
-def smooth_values(values, amount, iterations=3, strength=100.0):
-    """Smooth 결과.
-
-    amount    : -100(Rough) ~ +100(Smooth). 0 이면 원본 그대로.
-    iterations: 가우시안 패스 수(클수록 넓게 뭉갠다).
-    strength  : 0~100. amount 에 곱해지는 전체 세기.
-    """
-    t = (amount / 100.0) * (strength / 100.0)
-    if abs(t) < EPS or len(values) < 3:
-        return list(values)
-    return mix(values, gaussian_smooth(values, iterations), t)
+# gaussian_smooth / mix / smooth_values 는 2026-11-26 Framework/core/curve_smooth.py 로 올렸다
+# (A00540_JaliLipSync 가 키를 걸 때 같은 Smooth 를 쓴다). 이름 · 동작은 그대로 - 여기서 다시 노출한다.
+from Framework.core.curve_smooth import gaussian_smooth, mix, smooth_values  # noqa: E402,F401
 
 
 def intensity_values(values, amount):

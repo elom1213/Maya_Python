@@ -29,3 +29,8 @@ metadata:
   `JUN_JALI_Voice/0060_Vivian_voice/out_en_002` 5 클립). 창 minimumSizeHint 831(1080p 기준으로 U9 한계를 850 으로). 마야 GUI 미확인.
 
 관련: [[mayapy-headless-verify]], [[qapplication-before-maya-standalone]], [[new-tool-needs-icon]]
+
+- **v01.04 완료 (2026-11-26)** — Options 를 `Default` / `Smooth` 탭으로. Smooth(기본 켜짐 · Amount 50 · Iterations 3 · Strength 100 %) = A00110 Curve > Filters > Smooth 수식을
+  **어트리뷰트마다 전 구간(클립 + hold 키) 키 값에 한 번** 적용 후 setKeyframe. 수식은 `Framework/core/curve_smooth.py` 로 승격, A00110 `curve_filter_manager` 가 거기서 import(같은 숫자 보장).
+  `keyer.apply_sequence(smooth=None)` 기본이라 A00560 · A00570 무변. 알아 둘 것: Smooth 켜면 hold 구간이 완전히 평평하지 않다(경계도 다듬어짐) — 그래서 test_ui U2~U12 는 Smooth 끄고 옛 동작 시험.
+  창 최소 높이 831 → 868(오프스크린, 탭 바) → U9 한계 900. 마야 GUI 미확인.
