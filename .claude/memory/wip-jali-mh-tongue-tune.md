@@ -1,6 +1,6 @@
 ---
 name: wip-jali-mh-tongue-tune
-description: "메타휴먼 JALI 리그 혀 조절 더미 JALI_TONGUE_TUNE 계획(2026-11-26, JUN_JALI docs/0150, 구현 전) - Brant 한국어 대사 혀 밑면 보임의 원인 3개 실측. 핵심 발견 = A00540 매핑이 COARTIC 에 음소와 같은 txt 열을 넣어 혀끝 올림이 1.61배"
+description: "메타휴먼 JALI 리그 혀 조절 더미 JALI_TONGUE_TUNE 계획(2026-11-26, JUN_All/docs/plans/JALI_MH_TongueTune_plan.md, 구현 전 · 작업은 Maya_Python JUN_All 세션) - Brant 한국어 대사 혀 밑면 보임의 원인 3개 실측. 핵심 발견 = A00540 매핑이 COARTIC 에 음소와 같은 txt 열을 넣어 혀끝 올림이 1.61배"
 metadata:
   node_type: memory
   type: project
@@ -8,7 +8,8 @@ metadata:
   modified: 2026-11-26T01:53:30.298Z
 ---
 
-계획서 `JUN_JALI/docs/0150_mh_jali_tongue_tune_plan.md` (2026-11-26, **구현 전**, JUN_JALI 에 로컬 커밋). 사용자가 방법 2(rig 그룹 안 실시간 조절 더미)를 선호.
+계획서 `Maya_Python/JUN_All/docs/plans/JALI_MH_TongueTune_plan.md` (2026-11-26, **구현 전 — 사용자가 시작을 말할 때까지 대기**). 처음 JUN_JALI `docs/0150` 으로 썼다가 같은 날 사용자 지시로 이 자리로 옮김(JUN_JALI 에서는 삭제).
+**이 작업은 Maya_Python `JUN_All` 세션에서 진행한다**(사용자 지시 2026-11-26). 생성 스크립트 위치는 계획서 Q5(권장 `JUN_JALI/examples/`, 미답). 사용자가 방법 2(rig 그룹 안 실시간 조절 더미)를 선호.
 대상 리그 `C:\JUN\JUN_Src_Rig\07_MH_sample_02\0010_sample_0050_JaLiMap.mb` → 결과 `0010_sample_0060_JaLiTongue.mb`, 스크립트 `JUN_JALI/examples/build_mh_jali_tongue_tune.py` · `check_…`.
 관찰 씬 `D:\D__1010_PortFolio\00010_JALI_Brant\0010_Metahuman_01.mb` (30 fps, 레퍼런스 `oldRN` ns `MH`, 키는 `MH:DUMMY_IN_*` 23개).
 
