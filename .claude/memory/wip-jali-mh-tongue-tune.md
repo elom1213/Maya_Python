@@ -8,8 +8,11 @@ metadata:
   modified: 2026-11-26T01:53:30.298Z
 ---
 
-계획서 `Maya_Python/JUN_All/docs/plans/JALI_MH_TongueTune_plan.md` (2026-11-26, **구현 전 — 사용자가 시작을 말할 때까지 대기**). 처음 JUN_JALI `docs/0150` 으로 썼다가 같은 날 사용자 지시로 이 자리로 옮김(JUN_JALI 에서는 삭제).
-**이 작업은 Maya_Python `JUN_All` 세션에서 진행한다**(사용자 지시 2026-11-26). 생성 스크립트 위치는 계획서 Q5(권장 `JUN_JALI/examples/`, 미답). 사용자가 방법 2(rig 그룹 안 실시간 조절 더미)를 선호.
+계획서 `Maya_Python/JUN_All/docs/plans/JALI_MH_TongueTune_plan.md` (2026-11-26). 처음 JUN_JALI `docs/0150` 으로 썼다가 같은 날 사용자 지시로 이 자리로 옮김(JUN_JALI 에서는 삭제).
+**이 작업은 Maya_Python `JUN_All` 세션에서 진행한다**(사용자 지시 2026-11-26). 사용자가 방법 2(rig 그룹 안 실시간 조절 더미)를 선택, Q1~Q5 "권장대로".
+- **구현 · mayapy 검증 완료 (2026-11-26)**: `0010_sample_0060_JaLiTongue.mb` 생성, check 37 항목 OK(중립값 = 0050 과 1e-6 동일, 입술/턱 무변, 순환 없음, A00540 호환).
+  Brant 복사본 `JUN_JALI/out/0150/0010_Metahuman_01_tune.mb` 에서 문제 구간 tipUp 최대 0.561 → 0.211. **사용자 GUI 확인(S7) 대기** — 값 조절 결과를 받으면 ATTRS 권장 기본을 바꿔 재생성(S8).
+- 함정: 효과 예측 때 `coarticWeight` 가 `CO.GK → tongueTipDown` 도 줄이는 걸 빼서 110 프레임 예측 0.11 vs 실측 0.122 — 혀끝 순값(올림 − 내림)은 양쪽을 다 계산할 것.
 대상 리그 `C:\JUN\JUN_Src_Rig\07_MH_sample_02\0010_sample_0050_JaLiMap.mb` → 결과 `0010_sample_0060_JaLiTongue.mb`, 스크립트 `JUN_JALI/examples/build_mh_jali_tongue_tune.py` · `check_…`.
 관찰 씬 `D:\D__1010_PortFolio\00010_JALI_Brant\0010_Metahuman_01.mb` (30 fps, 레퍼런스 `oldRN` ns `MH`, 키는 `MH:DUMMY_IN_*` 23개).
 

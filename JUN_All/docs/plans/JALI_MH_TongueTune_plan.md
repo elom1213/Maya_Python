@@ -1,6 +1,6 @@
 # 메타휴먼 JALI 혀 조절 더미 (`JALI_TONGUE_TUNE`) — 관찰 · 원인 · 작업 계획서
 
-> **작성** 2026-11-26 · 상태: **계획 (구현 전)** · 위치: 처음 `JUN_JALI/docs/0150_mh_jali_tongue_tune_plan.md` 로 썼다가 같은 날 이 자리로 옮김(사용자 지시 — 작업은 Maya_Python `JUN_All` 세션에서) · 대상 Maya 2024 (mayapy 로 생성 · 검증, 마지막 눈 확인만 GUI)
+> **작성** 2026-11-26 · 상태: **구현 · mayapy 검증 완료 (2026-11-26, §12) — 사용자 GUI 확인(S7) 대기** · 위치: 처음 `JUN_JALI/docs/0150_mh_jali_tongue_tune_plan.md` 로 썼다가 같은 날 이 자리로 옮김(사용자 지시 — 작업은 Maya_Python `JUN_All` 세션에서) · 대상 Maya 2024 (mayapy 로 생성 · 검증, 마지막 눈 확인만 GUI)
 > 원본 리그: `C:\JUN\JUN_Src_Rig\07_MH_sample_02\0010_sample_0050_JaLiMap.mb` — 0110 계획 (`JUN_JALI/docs/0110_jali_mh_dummy_plan.md`)으로 만든 JALI 더미 리그
 > 관찰 씬: `D:\D__1010_PortFolio\00010_JALI_Brant\0010_Metahuman_01.mb` — 위 리그를 네임스페이스 `MH` 로 레퍼런스(`oldRN`),
 > `JUN_JALI_Voice\0070_Brant\00010_brant_kr\out_0010\brant_kr.txt` 를 A00540_JaliLipSync(Default 탭, 매핑 `jali_slider_dummy_in`)로 키를 넣은 결과
@@ -117,7 +117,7 @@ DUMMY_IN_PHONEMES.* / DUMMY_IN_COARTIC.*
 
 ---
 
-## 4. 결정 사항 (권장 = 이대로 진행)
+## 4. 결정 사항 (2026-11-26 사용자 "권장대로 진행" — 전부 권장으로 확정)
 
 | ID | 결정 | 권장 | 이유 |
 |----|------|------|------|
@@ -202,6 +202,7 @@ DUMMY_IN_PHONEMES.* / DUMMY_IN_COARTIC.*
 | D + `tipUpMax` 0.5 | C 와 같음 (안전망, 이 대사에서는 안 걸림) | | |
 
 - 권장값(D)이면 혀끝 올림 최대가 0.56 → 0.21, `vis` 가 약 1/4. `tongueUp` 도 0.19 → 0.12 (`coarticWeight` 0.3).
+- **정정 (구현 후 실측, §12)**: 위 표는 `coarticWeight` 가 혀끝 **내림**(`CO.GK` → `tongueTipDown`)도 줄인다는 것을 빼고 계산했다. 실제 0060 에서는 110 · 130 · 195 프레임이 **0.122 · 0.086 · 0.209** (표의 0.11 · 0.09 · 0.21 과 ±0.012), 문제 구간 최대 0.211 · vis 0.042 는 같다.
 - 평균이 음수로 간다 = 혀끝이 평균적으로 살짝 아래(아랫니 뒤) — 너무 내려가 ㄴ · ㄷ 에서 **혀가 아예 안 보이면** `coarticWeight` 를 0.5 쪽으로, `jawOpenSuppress` 를 0.4 쪽으로 (§7 조정 가이드).
 - 이 수치는 컨트롤러 값까지다. **눈으로 본 결과**(혀 밑면이 실제로 안 보이는지)는 §8 S7 에서 사용자가 판단한다.
 
@@ -292,7 +293,7 @@ GAIN = {'tongueTipUp': 'tipUpWeight', 'tongueTipDown': 'tipDownWeight', 'tongueB
 
 ---
 
-## 11. 확인 질문 (답이 없으면 권장으로 진행)
+## 11. 확인 질문 — **전부 권장으로 확정** (2026-11-26 사용자 "권장대로 작업 진행해")
 
 | # | 질문 | 권장 |
 |---|------|------|
@@ -306,4 +307,47 @@ GAIN = {'tongueTipUp': 'tipUpWeight', 'tongueTipDown': 'tipDownWeight', 'tongueB
 
 ## 12. 구현 · 검증 결과
 
-(S4 – S8 후 기록)
+### 12.1 만든 것 (2026-11-26, 이 PC · mayapy 2024)
+
+- 결과 리그 **`C:\JUN\JUN_Src_Rig\07_MH_sample_02\0010_sample_0060_JaLiTongue.mb`** (28.2 MB) = `0050_JaLiMap` + `JALI_TONGUE_TUNE`(어트리뷰트 10, 기본 = 권장값) + `jtt_*` 노드 22. 0050 은 그대로.
+- 스크립트 `JUN_JALI/examples/build_mh_jali_tongue_tune.py` (`--neutral` 지원, 사전 검사 실패면 아무것도 안 만듦 — 0060 에 다시 돌리면 `JALI_TONGUE_TUNE already exists` 로 막힘 확인) ·
+  `JUN_JALI/examples/check_mh_jali_tongue_tune.py <0050.mb> <0060.mb>`.
+- 명령 (재생성할 때):
+  ```
+  cd JUN_JALI/examples
+  "C:/Program Files/Autodesk/Maya2024/bin/mayapy.exe" build_mh_jali_tongue_tune.py "C:/JUN/JUN_Src_Rig/07_MH_sample_02/0010_sample_0050_JaLiMap.mb" "C:/JUN/JUN_Src_Rig/07_MH_sample_02/0010_sample_0060_JaLiTongue.mb"
+  "C:/Program Files/Autodesk/Maya2024/bin/mayapy.exe" check_mh_jali_tongue_tune.py "C:/JUN/JUN_Src_Rig/07_MH_sample_02/0010_sample_0050_JaLiMap.mb" "C:/JUN/JUN_Src_Rig/07_MH_sample_02/0010_sample_0060_JaLiTongue.mb"
+  ```
+  (0060 을 다시 만들려면 기존 0060 을 지우거나 다른 이름으로 — 스크립트는 덮어쓴다.)
+
+### 12.2 검증 — `check_mh_jali_tongue_tune.py` **`RESULT OK` (37 항목)**
+
+| # | 결과 |
+|---|------|
+| T1 | 위치 `DMY_grp` · 10 어트리뷰트(키 가능 · 범위 · 기본 = 권장) · 변환 잠금 · `jtt_` 22 · 혀 5개가 `jtt_cl_*` 에서 · weight 탭 5 · 입술/턱 직접 4개는 `jali_cl_mh_*` 그대로 |
+| T2 | 중립값에서 28 케이스(음소 16 · 동시조음 5 · 섞음 7) × `CTRL_expressions` 252 + `dmy_in_jali_mh` 9 가 0050 과 **1e-6 이내** |
+| T3 | 16 항목 (`coarticWeight` 0.3 → tipUp 0.91 · tongueUp 0.405, `rrrTipWeight` 0.4 → 0.252, `tongueWeight` · `tipUpWeight` · `tipUpMax` · `tipDown/bendUp/tongueUpWeight`, clamp 1) |
+| T4 | 억제 0.6 · ref 0.4: jawOpen 0.15 → 0.2364, 0.25 → 0.1906, 0.65 → 0.122, 억제 0 이면 0.305, tipDown 무변 |
+| T5 | 권장값에서 혀 밖의 모든 expression · 입술/턱 직접값이 0050 과 1e-6 이내 |
+| T6 | `cycleCheck -all` 없음 · 혀 컨트롤러 8개 tx/ty 비연결 · `tongueWeight` 키(1 → 0)가 시간에 따라 먹힘 |
+| T7 | A00540 `jali_slider_dummy_in` 의 `check_targets` 빈 목록 (A00540 그대로 0060 에 키를 넣을 수 있다) |
+
+- 0050 · 0060 을 열 때 `Errors loading XML` · `Errors have occurred while reading this scene` 경고가 나는데 **0050 원본에서도 똑같이** 난다(기존 상태, 이번 작업과 무관).
+
+### 12.3 T8 — Brant 씬 복사본 (S6)
+
+원본 `D:\D__1010_PortFolio\00010_JALI_Brant\0010_Metahuman_01.mb` 을 열어 `oldRN` 을 0060 으로 교체 → `JUN_JALI/out/0150/0010_Metahuman_01_tune.mb` 로 저장 (**원본 씬은 저장하지 않음**).
+
+| 값 (`tongueTipUp − tongueTipDown`) | 교체 전 (0050) | 교체 후 (0060 권장값) |
+|-----------------------------------|---------------:|----------------------:|
+| 문제 구간 최대 | 0.561 | **0.211** |
+| 문제 구간 vis (max(tip,0) × jawOpen 최대) | 0.177 | **0.042** |
+| 전 구간 최대 · vis | 0.561 · 0.189 | 0.211 · 0.050 |
+| `tongueUp` 문제 구간 최대 | 0.192 | 0.120 |
+| 110 · 130 · 195 프레임 | 0.443 · 0.380 · 0.474 | **0.122 · 0.086 · 0.209** |
+
+- `MH:DUMMY_IN_*` 키 연결 23개 그대로 (레퍼런스 교체로 키가 떨어지지 않는다). `jawOpen` 은 781 프레임 전부 차이 0, 130 프레임 입술(`mouthLipsTogetherUL` · `mouthFunnelUL`) 같음.
+
+### 12.4 남은 것
+
+- **S7 사용자 GUI 확인**: 원본 씬에서 Reference Editor → `oldRN` → Replace Reference → `0010_sample_0060_JaLiTongue.mb` (또는 위 복사본을 열어 바로 재생). 세 구간 + §10 의 다른 구간에서 혀 밑면이 안 보이는지, ㄴ · ㄷ 에서 혀끝이 너무 죽지 않았는지 → §7 순서로 조절. 정한 값을 알려 주면 §5.1 기본값에 반영해 다시 생성(S8).

@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-26 (오늘)
 
+> [!summary] **JALI 메타휴먼 혀 조절 더미 `JALI_TONGUE_TUNE` — `0010_sample_0060_JaLiTongue.mb`** `#JALI` `#MetaHuman`
+- 요청: Brant 한국어 대사(A00540 로 키)에서 50–65 · 100–160 · 180–260 구간 혀가 너무 올라가 밑면이 보임 → 개선. 방법 = rig 그룹 안 실시간 조절 더미(사용자 선택).
+- 관찰(mayapy, 781 프레임): 원인 3개 — A00540 매핑이 `DUMMY_IN_COARTIC.LNTD/GK` 에 음소와 같은 열을 넣어 혀끝 올림 1.61배 · `RRR` 0.63 은 영어 권설음 값 · 입이 열려도 혀끝을 안 내림.
+- `|rig|DMY_grp|JALI_TONGUE_TUNE` 키 가능 어트리뷰트 10개(혀 세기 · 동시조음 · RRR · 입 벌림 억제 · 상한) + `jtt_*` 노드 22. 스크립트 `JUN_JALI/examples/build_mh_jali_tongue_tune.py` · `check_…` (37 항목 OK, 중립값 = 0050 과 1e-6 동일).
+- Brant 씬 복사본에 레퍼런스 교체: 문제 구간 혀끝 최대 0.561 → 0.211, 입술 · 턱 무변. 계획 · 결과 `docs/plans/JALI_MH_TongueTune_plan.md`. 사용자 GUI 확인 대기.
+
 > [!summary] **`A00540_JaliLipSync` v01.04 — Options 탭 Default / Smooth : 키를 A00110 Filters Smooth 로 다듬어 건다** `#A00540_JaliLipSync`
 - 요청: Apply 로 거는 Phonemes · Coartic · JaLi 키가 모든 구간에서 A00110 Curve > Filters > Smooth 를 준 상태로 들어가게, 기본 50 · 정도 조절 가능,
   Options 를 탭 2개로(지금 UI = Default, 새 Smooth 탭).

@@ -131,7 +131,7 @@
 - A00590 — [SwingTwistNative v01.01](wip-a00590-swingtwist-native.md)
 - A00580 — [FacialBoardBuilder · Ctl_Only_V05](wip-facial-arkit52-ctl-v05.md)
 - JALI 슬라이더 리그 — [A0020_jali_slider_ctl](wip-jali-slider-ctl.md)
-- JALI 메타휴먼 혀 — [JALI_TONGUE_TUNE 계획](wip-jali-mh-tongue-tune.md) (`docs/plans/JALI_MH_TongueTune_plan.md`, 구현 전 · JUN_All 세션에서 진행 · A00540 매핑이 COARTIC 에 음소 열 중복)
+- JALI 메타휴먼 혀 — [JALI_TONGUE_TUNE 계획](wip-jali-mh-tongue-tune.md) (`docs/plans/JALI_MH_TongueTune_plan.md`, 0060 구현 · 검증 완료, GUI 확인 대기 · JUN_All 세션에서 진행 · A00540 매핑이 COARTIC 에 음소 열 중복)
 - A00620 — [NameDecoder](wip-a00620-namedecoder.md)
 - A00610 — [PmxImporter](wip-a00610-pmximporter.md)
 - A00630 — [MotionPathEditor v01.15](wip-a00630-motion-path.md)
