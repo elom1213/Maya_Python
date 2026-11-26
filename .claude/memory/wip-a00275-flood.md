@@ -1,8 +1,11 @@
 ---
 name: wip-a00275-flood
-description: A00275 v01.40 Weights > Flood — Kangaroo SkinCluster > Flood port that works with same-name joints (all full paths); two original bugs fixed (Blend ignored, Scale All = Value/n); GUI check pending
+description: "A00275 v01.40 Weights > Flood — Kangaroo SkinCluster > Flood port that works with same-name joints (all full paths); two original bugs fixed (Blend ignored, Scale All = Value/n); GUI check pending"
 metadata:
+  node_type: memory
   type: project
+  originSessionId: 1071b570-6bf0-4461-9564-c09a8b6dd4bf
+  modified: 2026-11-26T05:30:19.758Z
 ---
 
 A00275_skinTool_V01 v01.40 (2026-11-19) — `Weights > Flood` (after Move). Core `app/core/weight_flood_manager.py`,
@@ -25,5 +28,8 @@ the user expected selecting a mesh to list its joints; plain `Select Joints` onl
 
 v01.42 : `Add Influence` button - Get Bound Joints remembers the mesh(es) by UUID (`Mesh :` label); scene-selected joints
 are added to that skinCluster with weight 0 (`skinCluster -e -addInfluence -weight 0`) and appended to the list.
+
+v01.49 (2026-11-26) : after Add Influence those joints (new + already bound) are **selected in the list** (old list
+selection cleared, `select_by_nodes` blocks signals -> call `_update_button` yourself) so Flood hits only them.
 
 Related: [[kangaroo-headless-golden-test]] · [[wip-a00275-move-joints]] · [[framework-tsl-attach-uuids]]

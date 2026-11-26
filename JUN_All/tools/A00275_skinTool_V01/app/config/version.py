@@ -80,5 +80,8 @@
 #        Flood 는 리스트에서 고른 행이 있으면 **그 조인트만**, 없으면 전부(버튼에 `N selected joint(s)`).
 #        공용 TSL 에 select_by_nodes · arrange(depths) · node_at · DEPTH_ROLE · btn_add 추가(기존 동작 그대로).
 
-VERSION = "01.48"
-LAST_UPDATE = "2026-11-25"
+# 01.49  Weights > Flood - `Add Influence` 뒤 그 조인트들(새로 붙인 것 + 이미 바인드돼 있던 것)이 리스트에서 **선택**된다
+#        (이전 리스트 선택은 지움) -> 바로 Flood 하면 그 조인트만. 조인트를 안 골랐으면 리스트 선택은 그대로.
+
+VERSION = "01.49"
+LAST_UPDATE = "2026-11-26"

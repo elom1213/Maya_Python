@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-25
-# A00275_skinTool_V01 - Weights > Flood 탭 UI (v01.40, v01.48 Select in List)
+# last Update date : 2026-11-26
+# A00275_skinTool_V01 - Weights > Flood 탭 UI (v01.40, v01.48 Select in List, v01.49 Add Influence 후 리스트 선택)
 """
 Weights > Flood - 고른 조인트(들)에 웨이트를 채운다. Kangaroo `SkinCluster > Flood` 이식.
 
@@ -133,7 +133,8 @@ class FloodTab(QWidget):
         self.btn_add_infl.setToolTip(
             "Add the joints selected in the scene to the skinCluster of the mesh(es)\n"
             "read by Get Bound Joints, with weight 0 (like Maya's Skin > Add Influence),\n"
-            "and put them in the list. The mesh shape does not change.")
+            "and put them in the list. The mesh shape does not change.\n"
+            "The joints are then selected in the list, so Flood works on them only.")
         # v01.48 - 씬에서 고른 조인트를 리스트에서 골라 준다 -> 이어서 Flood 하면 그 조인트만.
         self.btn_pick = self.tsl_joints.add_button("Select in List", self.on_select_in_list, index=2)
         self.btn_pick.setToolTip(
@@ -526,6 +527,21 @@ class FloodTab(QWidget):
         if listed:
             self.tsl_joints.append_unique([(cmds.ls(j) or [j])[0] for j in listed])
             self._apply_hierarchy()
+            self._select_listed(listed)
+
+    def _select_listed(self, nodes):
+        """v01.49 - Add Influence 한 조인트를 리스트에서 골라 둔다 -> 이어서 Flood 하면 그 조인트만.
+
+        이전 리스트 선택은 지운다(select_by_nodes). 요약 모드면 먼저 펼친다(Select in List 와 같다).
+        select_by_nodes 는 시그널을 막으므로 Flood 버튼 글자는 여기서 갱신한다.
+        """
+        if self.tsl_joints.is_deferred():
+            self.tsl_joints.show_all()
+            self._apply_hierarchy()
+        rows = self.tsl_joints.select_by_nodes(nodes)
+        self._update_button()
+        if rows:
+            self._log("[OK] Selected {0} joint(s) in the list - Flood will use only these.".format(len(rows)))
 
     def on_flood(self, *args):
         joints = self.joints()

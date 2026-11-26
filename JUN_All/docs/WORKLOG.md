@@ -33,6 +33,12 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ## 2026-11-26 (오늘)
 
+> [!summary] **`A00275_skinTool_V01` v01.49 — Flood : Add Influence 한 조인트를 리스트에서 선택** `#A00275_skinTool_V01`
+- 요청: Weights > Flood 에서 `Add Influence` 로 인플루언스를 붙이면 그 조인트들이 TSL 에서 선택되게.
+- 새로 붙인 조인트 + 이미 바인드돼 있던 조인트(둘 다 리스트에 붙음)를 공용 TSL `select_by_nodes` 로 선택, 이전 선택은 지움 → 바로 Flood 하면 그 조인트만.
+  요약 모드면 먼저 펼침, Flood 버튼 글자 갱신. 조인트를 안 골랐으면 리스트 선택 그대로.
+- 시험 `tests/test_flood_ui.py` 57/57 (새 4). 마야 GUI 확인 아직.
+
 > [!summary] **JALI 메타휴먼 혀 조절 더미 `JALI_TONGUE_TUNE` — `0010_sample_0060_JaLiTongue.mb`** `#JALI` `#MetaHuman`
 - 요청: Brant 한국어 대사(A00540 로 키)에서 50–65 · 100–160 · 180–260 구간 혀가 너무 올라가 밑면이 보임 → 개선. 방법 = rig 그룹 안 실시간 조절 더미(사용자 선택).
 - 관찰(mayapy, 781 프레임): 원인 3개 — A00540 매핑이 `DUMMY_IN_COARTIC.LNTD/GK` 에 음소와 같은 열을 넣어 혀끝 올림 1.61배 · `RRR` 0.63 은 영어 권설음 값 · 입이 열려도 혀끝을 안 내림.

@@ -277,6 +277,28 @@ logs48[:] = []
 t48.btn_pick.click()
 check("no joint selected -> warning", any("Select joints in the scene" in m for m in logs48), logs48)
 
+# ---- v01.49 Add Influence 뒤 그 조인트들이 리스트에서 선택된다 (이전 리스트 선택은 지움)
+cmds.select(clear=True)
+_tmp49 = cmds.joint(name="new49", position=(0, 0, -3))
+_uuid49 = cmds.ls(_tmp49, uuid=True)[0]
+cmds.parent(_tmp49, "G")
+cmds.rename(cmds.ls(_uuid49)[0], "dup1")                  # G 아래 두 번째 조인트, 아직 바인드 안 됨
+new49 = cmds.ls(_uuid49, long=True)[0]
+t48.tsl_joints.select_by_nodes(["|G|dup"])               # 이전 선택
+cmds.select([new49, "|root"])                             # 새 조인트 + 이미 바인드된 조인트
+logs48[:] = []
+t48.btn_add_infl.click()
+check("Add Influence selects the added / already-bound joints in the list (old selection cleared)",
+      sorted(t48.tsl_joints.selected_nodes()) == sorted([new49, "|root"]), (t48.tsl_joints.selected_nodes(), logs48))
+check("Flood button follows the new list selection", "2 selected joint" in t48.btn_flood.text(), t48.btn_flood.text())
+check("joints() = the added joints", sorted(t48.joints()) == sorted([new49, "|root"]), t48.joints())
+cmds.select(clear=True)
+t48.tsl_joints.select_by_nodes(["|G|dup"])
+logs48[:] = []
+t48.btn_add_infl.click()
+check("no joint selected -> list selection untouched", t48.tsl_joints.selected_nodes() == ["|G|dup"],
+      t48.tsl_joints.selected_nodes())
+
 print("\nRESULT: {0}/{1} passed".format(sum(R), len(R)))
 maya.standalone.uninitialize()
 os._exit(0 if all(R) else 1)
