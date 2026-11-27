@@ -2,6 +2,22 @@
 
 All notable changes to this tool are documented here.
 
+## [01.60] - 2026-11-27
+
+- **[Path Structure] Saved Structures 를 File Manager 프로파일에서 독립**(사용자 — `Dnable_CH` 가 `Local_CH_D` 에서만 보였다).
+  - 저장 위치 `<Store Repo>/profiles/<Data Folder>/path_structures/` → **저장소 루트 `path_structures/`**. 프로파일 · Source Mode · Data Folder 를 바꿔도 목록 · 선택이 그대로다.
+  - **카테고리**: 목록이 카테고리 트리로(카테고리 = 굵게 + 개수). `New Category` · `Rename` · `Delete` · `Move To...`(여러 구조 한 번에), Save 그룹에 `Category` 콤보.
+    카테고리 하나 = `path_structures/_categories/<id>.json`, 구조 JSON 은 `category` 에 id — 이름을 바꿔도 그 파일 하나만, 두 PC 가 동시에 카테고리를 만들어도 충돌 없음.
+    카테고리 삭제 = 비었으면 확인, 구조가 있으면 `Move to Uncategorized` / `Delete Structures Too` / `Cancel`. 카테고리 없는(지워진) 구조는 `Uncategorized`.
+  - **탭 전용 `Pull` / `Push`**(Saved Structures 그룹 맨 위 `Library` 줄). Push 는 `path_structures/` **만** 커밋한다(File Manager 의 records 미커밋 변경은 안 섞인다).
+    Pull 은 git 특성상 브랜치 전체를 받는다 — 받은 뒤 File Manager 목록도 다시 읽는다. File Manager 의 Pull 뒤에도 Path Structure 목록을 다시 읽는다.
+  - 라이브러리 클론 경로 · `Recreate To` 는 **PC 단위** `~/.jun_filemanager/structure_library.json`(첫 실행 때 활성 프로파일 값으로 채움). 프로파일에는 더 저장하지 않는다.
+  - 옛 위치에 구조가 남아 있으면 로그 경고 한 번(이전 스크립트 안내).
+- **일회성 이전** `dev/migrate_structure_library.py <repo>`(dry-run) / `--apply`(git mv + 카테고리 = 옛 데이터 폴더 이름 + 로컬 커밋, 푸시 안 함). 멱등, 이름이 겹치면 `<이름>_<폴더>`.
+- **[Git] pull --rebase 가 충돌로 멈추면 `rebase --abort`** — 예전엔 클론이 'rebase 중' 으로 남아 다음 Pull / Push 가 막혔다. `GitSync(scope_rel=...)` 로 스테이징 범위 지정.
+- 시험 `tests/test_structure_library.py` 51항목(라이브러리 14 · 설정 3 · 이전 7 · git 6 · UI 21). 기존 시험은 새 생성자 · PC 설정에 맞춤(`test_path_structure_prune` · `test_ui_paths` ·
+  `test_file_date` · `test_sync_ui` — MainWindow 를 만드는 시험이 실제 PC 설정 파일을 만들지 않게 임시 경로).
+
 ## [01.58] - 2026-11-23
 
 - **[Sync] Status 탭에도 `Scan depth`**(사용자) — 버튼 줄 오른쪽. Roots 탭의 칸과 **같은 설정**(루트의 공유 `scan_depth`)이라 한쪽을 바꾸면 다른 쪽도 바로 같아진다.

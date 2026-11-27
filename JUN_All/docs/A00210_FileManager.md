@@ -21,23 +21,26 @@ Maya 씬 파일(`.mb` / `.ma`)의 **버전·작업 기록 추적** 파이프라�
 | **Project Root** | Maya 파일들이 모여 있는 작업 루트. 기록 키(key)를 이 기준 **상대경로**로 만든다. |
 | **Source Mode** | 기록·썸네일을 어디서 읽고 쓸지: **Remote (Git)** = 중앙 git 데이터 리포(Pull/Push), **Local (Shared / NAS)** = 공유 폴더 직접 사용(git 미사용). 프로파일별로 저장(v01.23). |
 | **Store Repo / Shared Folder** | 데이터 스토어 폴더 입력 **한 칸**(v01.26). Source Mode 에 따라 라벨/설명이 바뀐다 — Remote 면 **Store Repo**(중앙 git 데이터 리포의 로컬 clone, 예: `JUN_FileManager_data`), Local 이면 **Shared Folder**(git 없이 직접 쓰는 공유/NAS 폴더). 두 모드의 경로는 프로파일에 각각(`store_dir`/`local_dir`) 저장돼, 모드를 오가도 상대 경로가 지워지지 않는다. **v01.44~ 칸은 읽기 전용** — 붙여넣기 · 타이핑으로 바뀌지 않고 `Browse...` 로만 바꾼다(실수 방지, 선택 · 복사는 됨). |
-| **Data Folder** (v01.45~) | 저장소 안 **`profiles/<이름>/`** — 이 프로파일의 records · thumbs · lineage · path_structures 가 있는 폴더. 편집 가능한 드롭다운(= `profiles/` 하위 폴더, 새 이름 = 새 폴더). 여러 프로파일이 같은 폴더를 써도 된다(예: 7개 프로파일이 `Dnable`). 예전에는 프로파일마다 **git 브랜치**로 나눴다 — 브랜치는 이제 `main` 하나 |
+| **Data Folder** (v01.45~) | 저장소 안 **`profiles/<이름>/`** — 이 프로파일의 records · thumbs · lineage · manifests 가 있는 폴더(**path_structures 는 v01.60 부터 저장소 루트 — 프로파일 무관, 4-C**). 편집 가능한 드롭다운(= `profiles/` 하위 폴더, 새 이름 = 새 폴더). 여러 프로파일이 같은 폴더를 써도 된다(예: 7개 프로파일이 `Dnable`). 예전에는 프로파일마다 **git 브랜치**로 나눴다 — 브랜치는 이제 `main` 하나 |
 | **경로 표기** (v01.46~) | 화면의 경로는 전부 **슬래시(`/`)** 하나로 보인다 — `C:/Users/...`, NAS 는 `//172.30.1.93/...`. 프로파일 · 입력 칸 · Browse · 로그 · 툴팁 모두(`app/core/paths.py`). 역슬래시로 붙여 넣어도 입력을 마치면 바뀐다 |
 | **key** | `Project Root` 기준 상대경로(예: `chars/charA_rig.mb`). PC 가 달라도(예: `P:/proj` vs `D:/work`) **같은 파일이 같은 기록**에 매핑된다. |
 | **원본 제외** | 원본 mb/ma 는 데이터 스토어에 애초에 들어가지 않는다(git 모드는 `.gitignore` 로 `*.mb`/`*.ma` 이중 차단). |
 
-> **데이터 스토어 폴더**(records/thumbs/lineage/path_structures 의 부모)는 Source Mode 에 따라
-> Store Repo(git) 또는 Shared Folder(local) 가 된다. 모든 탭이 활성 모드의 폴더를 자동으로 따른다.
+> **데이터 스토어 폴더**(records/thumbs/lineage 의 부모)는 Source Mode 에 따라
+> Store Repo(git) 또는 Shared Folder(local) 가 된다. 모든 탭이 활성 모드의 폴더를 자동으로 따른다 —
+> **Path Structure 탭만 예외**(v01.60): 프로파일 · 모드와 무관하게 저장소 루트 `path_structures/` 를 쓴다(4-C).
 
 스토어 레이아웃 (v01.45~, 브랜치 `main` 하나):
 ```
 JUN_FileManager_data/                 # git repo (Private)
+├── path_structures/                  # v01.60~ Path Structure 라이브러리 - 모든 프로파일 공용 (4-C)
+│   ├── _categories/<id>.json         # 카테고리 하나 = 파일 하나
+│   └── <name>.json                   # 구조 (category = 카테고리 id)
 └── profiles/
     ├── Dnable/                       # Data Folder = Dnable 인 프로파일들
     │   ├── records/<key>.json        # records/chars/charA_rig.mb.json
     │   ├── thumbs/<key>.png
-    │   ├── lineage/<name>.json
-    │   └── path_structures/<name>.json
+    │   └── lineage/<name>.json
     ├── MUE/  SA/  src_rig/ ...
 ```
 - **Push 는 자기 Data Folder 만** 커밋하고, 올리기 전에 받아서(`pull --rebase`) 이어 붙인다 — 프로파일 · PC 가 동시에 올려도 폴더가 달라 충돌하지 않는다.
@@ -184,8 +187,8 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 - **설정**: Settings 의 **Source Mode** 를 **Local (Shared / NAS)** 로 바꾸고, **Shared Folder** 에
   공유 경로(예: `\\NAS\team\JUN_FileManager_data` 또는 매핑 드라이브 `Z:\...JUN_FileManager_data`)를
   지정한다. git 입력(`Store Repo`/`Remote`/`Branch`/`Remote URL`)과 **Pull / Push** 버튼은 자동 비활성된다.
-- **읽기/쓰기**: Scan·Save Record·썸네일·Lineage·Path Structure 모두 그 공유 폴더의 `records/`·`thumbs/`·
-  `lineage/`·`path_structures/` 에 **바로** 읽고 쓴다. 동료가 저장한 기록은 **Scan 으로 새로고침**해 본다
+- **읽기/쓰기**: Scan·Save Record·썸네일·Lineage 모두 그 공유 폴더의 `records/`·`thumbs/`·
+  `lineage/` 에 **바로** 읽고 쓴다(Path Structure 는 v01.60 부터 모드와 무관 — git 라이브러리, 4-C). 동료가 저장한 기록은 **Scan 으로 새로고침**해 본다
   (Pull 불필요).
 - **자동 폴더 생성**: **빈 공유 폴더**라도 첫 저장 시 `records/`·`thumbs/`(및 필요한 하위 폴더)가 자동으로
   만들어진다 — 별도 초기화 불필요.
@@ -285,11 +288,65 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 
 ---
 
-## 4-C. Path Structure 탭 — 폴더 구조 템플릿 (v01.01, 선택 기록 v01.07, 깊이·선택 재생성 v01.24, Rename·Recreate To v01.28, 파일 재생성 v01.29, Recreate To 독립 v01.32, Capture 경로 제약 없음 v01.33, 트리 루트 `.` v01.34, 해제한 폴더의 하위도 제외 v01.59)
+## 4-C. Path Structure 탭 — 폴더 구조 템플릿 (v01.01, 선택 기록 v01.07, 깊이·선택 재생성 v01.24, Rename·Recreate To v01.28, 파일 재생성 v01.29, Recreate To 독립 v01.32, Capture 경로 제약 없음 v01.33, 트리 루트 `.` v01.34, 해제한 폴더의 하위도 제외 v01.59, 라이브러리 독립 · 카테고리 v01.60)
 
 베이스 폴더의 **하위 폴더 구조**(v01.29~ **파일 목록도**)를 JSON 으로 저장
-(`<store_dir>/path_structures/<name>.json`, git 동기화)하고, 다른 PC 에서 **원하는 목적지 폴더**
+(`<Store Repo>/path_structures/<name>.json`, git 동기화)하고, 다른 PC 에서 **원하는 목적지 폴더**
 (`Recreate To`) 안에 재생성한다.
+
+### 라이브러리 — File Manager 프로파일과 독립 (v01.60)
+
+**저장된 구조는 프로파일과 무관하게 전부 보인다.** v01.59 까지는 `<Store Repo>/profiles/<Data Folder>/path_structures/` 에
+저장돼, 예를 들어 `Dnable_CH` 는 Data Folder 가 `Dnable` 인 프로파일(`Local_CH_D` 등)에서만 보였다.
+
+- **저장 위치** = 데이터 저장소 **루트의 `path_structures/`**. 상단 Profile · Source Mode · Data Folder 를 바꿔도 목록 · 선택 ·
+  Recreate To 가 그대로다.
+- **Library 줄**(Saved Structures 맨 위): 라이브러리 위치 표시 + `Browse...`(데이터 저장소 클론 고르기) + **`Pull` / `Push`**.
+  - **Push 는 `path_structures/` 만 커밋**한다 — File Manager 의 records 미커밋 변경은 섞이지 않는다(그건 File Manager 탭 Push).
+  - **Pull 은 git 특성상 브랜치 전체를 받는다**(다른 PC 가 올린 records 도 같이 — File Manager Pull 과 같은 결과). 받은 뒤
+    File Manager 파일 목록도 다시 읽는다. 거꾸로 File Manager 탭 Pull 뒤에도 이 목록을 다시 읽는다.
+  - 받는 중 충돌(두 PC 가 같은 구조를 따로 고침)이면 rebase 를 **자동으로 되돌리고**(`rebase --abort`) 실패로 알린다 —
+    로컬 파일은 그대로. 그때는 git 으로 직접 맞춘 뒤 다시 Push.
+- 라이브러리 클론 경로와 `Recreate To` 는 **PC 단위 설정** `~/.jun_filemanager/structure_library.json`(push 안 됨).
+  처음 실행할 때 활성 프로파일의 Store Repo · Recreate To 로 한 번 채워지고, 그 뒤로는 프로파일과 따로 간다.
+- 옛 위치(`profiles/*/path_structures`)에 구조가 남아 있으면 로그에 경고가 한 번 뜬다 → 아래 **이전** 참고.
+
+### 카테고리 (v01.60)
+
+```
+┌ Saved Structures ──────────────────────────────────────────────┐
+│ Library  C:/.../JUN_FileManager_data/path_structures            │
+│                                [Browse...] [Pull] [Push] Pull OK│
+│ ▾ Dnable  (13)                                                  │  ← 카테고리 = 굵게 + 개수
+│     Dnable_CH                                                   │
+│ ▾ MUE  (5)                                                      │
+│ ▸ Uncategorized  (1)                                            │  ← 카테고리 없는 구조가 있을 때만
+│ [Refresh][New Category][Rename][Delete][Move To...] [Recreate]  │
+```
+
+- **New Category** — 이름(대소문자 무시 중복 불가, `Uncategorized` 예약). 빈 카테고리도 남는다.
+- **Rename / Delete** — 고른 것이 카테고리면 카테고리, 구조면 구조에 동작. `Uncategorized` 는 바꾸거나 지울 수 없다.
+- **카테고리 Delete** — 비었으면 확인만. 구조가 있으면 `Move to Uncategorized`(기본) / `Delete Structures Too` / `Cancel`.
+- **Move To...** — Shift / Ctrl 로 고른 구조들을 다른 카테고리로.
+- **Save 그룹 `Category`** — 저장할 카테고리. 기본 = 트리에서 지금 고른 카테고리(구조를 골랐으면 그 구조의 카테고리).
+- 구조 이름은 **라이브러리 전체에서 유일**(다른 카테고리여도 같은 이름 불가).
+- 파일: 카테고리 하나 = `path_structures/_categories/<id>.json`, 구조 JSON 의 `category` = 그 id.
+  이름을 바꿔도 카테고리 파일 하나만 바뀌고, 두 PC 가 동시에 카테고리를 만들어도 git 충돌이 나지 않는다.
+  카테고리가 지워진(모르는 id) 구조는 `Uncategorized` 에 보인다.
+
+### 이전 — 한 번만 (v01.60)
+
+옛 위치의 구조를 새 위치로 옮기는 스크립트(릴리즈에는 없음, 저장소에서 실행):
+
+```
+python JUN_All/tools/A00210_FileManager/dev/migrate_structure_library.py <Store Repo>            # 미리보기(dry-run)
+python JUN_All/tools/A00210_FileManager/dev/migrate_structure_library.py <Store Repo> --apply    # 옮기고 로컬 커밋
+```
+
+- 옛 데이터 폴더 이름(Dnable · JUN · MUE · SA …) = 첫 카테고리. `git mv` 라 이력이 이어진다. 이름이 겹치면 `<이름>_<폴더>`.
+- `path_structures` 만 스테이징 — records 등 다른 미커밋 변경은 건드리지 않는다. **푸시는 하지 않는다** → 탭의 `Push` 로 내보낸다(로컬 커밋 전부가 나간다).
+- 다시 돌려도 안전(멱등) — 옛 버전 툴을 쓰는 PC 가 옛 위치에 새로 저장했으면 그것만 이어서 옮긴다.
+- 다른 PC 는 새 버전 설치 후 Path Structure `Pull` 한 번이면 된다.
 
 **Capture 는 어느 경로에서든 된다(v01.33~).** `Project Root`(File Manager 탭)가 비어 있어도, Base Folder 가
 그 밖(위 · 옆 · 다른 드라이브)이어도 캡처한다. v01.32 까지는 루트가 비면 `Set Project Root first`,
@@ -341,7 +398,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   단, **base 직속 파일은 최상위 폴더 체크리스트와 무관하게 항상 포함**된다(어느 최상위 폴더에도 속하지
   않는, base 폴더 자체의 내용물이라서).
 - **Capture**: 체크된 폴더를 지정 깊이까지 모아 (미저장 상태로) Preview 트리에 보여준다. 폴더가 있는데
-  하나도 체크 안 하면 경고. **Base Folder 는 어느 경로든 된다**(v01.33 — Project Root 와 무관). → **Name** 입력 후 **Save** 로 JSON 저장(File Manager 탭의 **Push** 로 동기화).
+  하나도 체크 안 하면 경고. **Base Folder 는 어느 경로든 된다**(v01.33 — Project Root 와 무관). → **Name** · **Category** 고른 뒤 **Save** 로 JSON 저장(Saved Structures 의 **Push** 로 동기화, v01.60).
 
 **Preview 트리뷰(v01.24)**: 선택한(또는 방금 Capture 한) 구조를 **트리 위젯**으로 보여준다
 (A00240 PathTool 의 *Tree* 탭과 동일한 형태).
@@ -373,7 +430,7 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
 - **Recreate To**(v01.28, v01.32 독립): 재생성 **목적지 베이스 폴더**. 체크된 폴더가 **이 폴더 바로 안**에 생성된다.
   직접 입력하거나 **Browse** 로 고른다. **File Manager 탭의 `Project Root` 와 무관하다**(v01.32) —
   구조를 선택하거나 목록이 새로고침돼도(프로파일 전환 포함) 이 칸은 **바뀌지도 지워지지도 않는다**.
-  값은 프로파일에 `recreate_to` 로 따로 저장돼 다음 실행에 복원된다.
+  값은 다음 실행에 복원된다 — v01.60 부터 프로파일이 아니라 **PC 단위 설정**(`structure_library.json`)에 저장(v01.59 까지는 프로파일의 `recreate_to`).
   > v01.28~v01.31 은 구조를 선택할 때마다 칸을 `<Project Root>/<base_rel>` 로 **덮어써서**, 적어 둔 경로가
   > 모르는 새 바뀌고 구조가 Project Root 쪽에 생성됐다. v01.32 에서 자동 채움을 없앴다.
   목적지 폴더가 아직 없으면 만들지 확인을 묻는다.
@@ -381,10 +438,10 @@ PC 마다 다른 절대경로·작업자명은 git 으로 공유하지 않고 **
   **Depth 이내 + 체크된 폴더만** 생성한다(이미 있으면 건너뜀). 실제로 폴더를 **생성**하는 버튼이라
   Refresh/Rename/Delete 와 색·위치로 구분된다.
 - **Rename**(v01.28): 선택한 저장 구조의 이름을 바꾼다(JSON 파일명 + 내부 `name` 동기화). 이미 있는
-  이름과 충돌하면 거부. 로컬 변경이므로 File Manager 탭의 **Push** 로 동기화한다.
+  이름과 충돌하면 거부. 로컬 변경이므로 Saved Structures 의 **Push** 로 동기화한다(v01.60, 카테고리는 유지).
 
 **사용 흐름**: Base 지정 → (Scan) → 기록할 폴더 체크(또는 **All**) → **Capture Depth** 지정 →
-(**Include files** 확인) → **Capture** → **Name** 입력 → **Save** → **Push**. 받는 PC 에서 같은 구조 선택 →
+(**Include files** 확인) → **Capture** → **Name** · **Category** → **Save** → Saved Structures **Push**. 받는 PC 에서 같은 구조 선택 →
 (**Recreate To** 확인/변경 · **Depth** 조절 · **Create files** 확인 · 필요 없는 항목 체크 해제) → **Recreate**.
 
 > 구버전(이전 저장분)도 그대로 열린다: `recursive: true` → Depth **All**, `recursive: false` → Depth **최상위**.
@@ -728,6 +785,8 @@ A00210_FileManager/
     │   ├── prefs.py         # PC 로컬 설정 저장/로드
     │   ├── git_sync.py      # GitSync: ensure/clone, pull, push (subprocess git)
     │   ├── path_structure.py# 폴더 구조 템플릿 캡처/재생성
+    │   ├── structure_library.py # v01.60 라이브러리(<repo>/path_structures) + 카테고리
+    │   ├── library_settings.py  # v01.60 PC 단위 설정 structure_library.json (repo_dir · recreate_to)
     │   ├── sync_settings.py # Sync: 공유 설정(루트 · 제외 경로 · 무시 패턴), is_excluded / is_ignored (v01.47)
     │   ├── sync_manifest.py # Sync: PC 매니페스트 스캔(해시 캐시 · 저장 중 건너뜀 · 정션) · 저장 / 읽기
     │   ├── sync_compare.py  # Sync: 매니페스트 비교 -> 파일마다 PC 별 상태 (순수 함수)

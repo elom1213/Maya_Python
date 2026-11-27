@@ -46,7 +46,10 @@ ps.save(STORE, ps.PathStructure(name="S", folders=["a", "a/b", "a/b/c", "ab", "x
 
 pst.QMessageBox.information = staticmethod(lambda *a, **k: None)
 LOG = []
-tab = pst.PathStructureTab(lambda: None, lambda: "", lambda: STORE, LOG.append)
+# v01.60 : 라이브러리 = PC 단위 설정의 repo_dir (프로파일 store_dir 은 첫 시드로만). 설정 파일은 임시 경로.
+from tools.A00210_FileManager.app.core import library_settings as LS   # noqa: E402
+LS.SETTINGS_PATH = TMP + "/structure_library.json"
+tab = pst.PathStructureTab(lambda: None, lambda: "", lambda: {"store_dir": STORE}, LOG.append)
 tab.on_refresh(select="S")
 tab.on_select_structure()
 tab.ipf_recreate_to.setText(OUT)

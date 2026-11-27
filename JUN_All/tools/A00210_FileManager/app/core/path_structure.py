@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-03
+# last Update date : 2026-11-27
 # A00210_FileManager - path structure templates (UI/DCC 비의존)
 #
 # 어떤 베이스 폴더의 하위 폴더 구조를 JSON 으로 저장하고, 다른 PC 에서 그 구조를
@@ -21,6 +21,8 @@
 # v01.34 : Preview 트리의 루트는 베이스 폴더 이름이 아니라 "." (ROOT_LABEL). 기록된 항목은 전부
 #          베이스 기준 상대경로라, 이름(A)을 보이면 재생성 때 A 폴더가 새로 생긴다고 오해한다.
 #          "." = Recreate To 폴더 자신. 원본 경로는 툴팁으로만 보인다.
+# v01.60 : 저장 위치가 프로파일 데이터 폴더가 아니라 **저장소 루트**(<repo>/path_structures)로 옮겨졌다 -
+#          store_dir 자리에 저장소 루트를 넘긴다(structure_library.StructureLibrary). 구조마다 category(카테고리 id) 필드.
 
 import os
 import json
@@ -62,6 +64,7 @@ class PathStructure:
     max_depth: int = 0         # 캡처 깊이(base 기준, top=1). 0 = 무제한(전체 트리)
     folders: list = field(default_factory=list)   # base_rel 기준 하위 폴더 상대경로(POSIX) 목록
     files: list = field(default_factory=list)     # base_rel 기준 파일 상대경로(POSIX) 목록
+    category: str = ""         # 카테고리 id (v01.60). "" = Uncategorized
     created_by: str = ""
     created_at: str = ""
 
@@ -85,6 +88,8 @@ class PathStructure:
             folders=list(data.get("folders", [])),
             # files 없는 구버전 JSON → 빈 목록(= 폴더만 재생성, 기존 동작 그대로).
             files=list(data.get("files", []) or []),
+            # category 없는 구버전 JSON → "" (Uncategorized).
+            category=data.get("category", "") or "",
             created_by=data.get("created_by", ""),
             created_at=data.get("created_at", ""),
         )
@@ -296,24 +301,36 @@ def save(store_dir, structure):
     return path
 
 
-def list_names(store_dir):
-    """저장된 구조의 표시 이름 목록(대소문자 무시 정렬). 없으면 []."""
+def list_entries(store_dir):
+    """저장된 구조의 (표시 이름, category id) 목록(이름 대소문자 무시 정렬). 없으면 [].
+
+    `_` 로 시작하는 항목(예: `_categories` 폴더)은 구조가 아니므로 건너뛴다(v01.60).
+    깨진 JSON 은 파일명을 이름으로, 카테고리는 "" 로.
+    """
     dir_path = structures_dir(store_dir)
     if not store_dir or not os.path.isdir(dir_path):
         return []
 
-    names = []
+    out = []
     for fname in os.listdir(dir_path):
-        if not fname.endswith(".json"):
+        if not fname.endswith(".json") or fname.startswith("_"):
+            continue
+        full = os.path.join(dir_path, fname)
+        if not os.path.isfile(full):
             continue
         try:
-            with open(os.path.join(dir_path, fname), "r", encoding="utf-8") as f:
+            with open(full, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            names.append(data.get("name") or fname[:-5])
+            out.append((data.get("name") or fname[:-5], data.get("category", "") or ""))
         except (OSError, ValueError):
-            names.append(fname[:-5])
+            out.append((fname[:-5], ""))
 
-    return sorted(names, key=str.lower)
+    return sorted(out, key=lambda e: e[0].lower())
+
+
+def list_names(store_dir):
+    """저장된 구조의 표시 이름 목록(대소문자 무시 정렬). 없으면 []."""
+    return [name for name, _cat in list_entries(store_dir)]
 
 
 def load(store_dir, name):

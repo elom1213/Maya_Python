@@ -1,5 +1,5 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-04
+# last Update date : 2026-11-27
 # A00210_FileManager - git sync (UI/DCC 비의존)
 #
 # 중앙 데이터 리포(records/thumbs)를 시스템 git 으로 pull/push 한다.
@@ -13,6 +13,9 @@
 #   - pull / push 전에 `pull --rebase --autostash` - 다른 PC 가 다른 폴더를 올렸어도 충돌 없이 이어 붙인다.
 #   - 푸시가 거절되면(그 사이 누가 올림) 한 번 더 받고 다시 올린다.
 #   - 클론의 현재 브랜치가 설정과 다르면 아무것도 하지 않는다(check_branch) - 옛 프로파일 브랜치 클론 보호.
+#
+# v01.60 : scope_rel - profiles/<folder> 대신 임의의 저장소 상대 경로만 스테이징(Path Structure 라이브러리 = path_structures).
+#   pull --rebase 가 충돌로 멈추면 rebase --abort 로 되돌린다(예전엔 클론이 'rebase 중' 으로 남아 다음 Pull/Push 가 막혔다).
 
 import os
 import subprocess
@@ -29,13 +32,17 @@ class GitSync:
 
     PROFILES_DIR = "profiles"
 
-    def __init__(self, store_dir, remote="origin", branch="main", data_folder=""):
+    def __init__(self, store_dir, remote="origin", branch="main", data_folder="", scope_rel=""):
         self.store_dir = os.path.abspath(store_dir) if store_dir else ""
         self.remote = remote or "origin"
         self.branch = branch or "main"
         self.data_folder = (data_folder or "").strip()
-        # 저장소 루트 기준 이 프로파일 데이터 폴더(git 경로라 슬래시)
-        self.data_rel = "{0}/{1}".format(self.PROFILES_DIR, self.data_folder) if self.data_folder else ""
+        self.scope_rel = (scope_rel or "").strip().strip("/")
+        # 저장소 루트 기준 스테이징 범위(git 경로라 슬래시). scope_rel 이 있으면 그것(v01.60), 아니면 프로파일 데이터 폴더.
+        if self.scope_rel:
+            self.data_rel = self.scope_rel
+        else:
+            self.data_rel = "{0}/{1}".format(self.PROFILES_DIR, self.data_folder) if self.data_folder else ""
 
     # ---------------------------------------------------------------- run
 
@@ -67,6 +74,10 @@ class GitSync:
 
     def _write_skeleton(self):
         """profiles/<data_folder>/records · thumbs + 루트 .gitignore 기본 구조 생성."""
+        if self.scope_rel:
+            # 라이브러리 같은 범위 전용 인스턴스는 records/thumbs 를 만들지 않는다(path_structures/records 방지).
+            os.makedirs(os.path.join(self.store_dir, *self.scope_rel.split("/")), exist_ok=True)
+            return
         base = os.path.join(self.store_dir, *self.data_rel.split("/")) if self.data_rel else self.store_dir
         os.makedirs(os.path.join(base, "records"), exist_ok=True)
         os.makedirs(os.path.join(base, "thumbs"), exist_ok=True)
@@ -192,13 +203,29 @@ class GitSync:
 
     # -------------------------------------------------------- pull / push
 
+    REBASE_ABORTED = ("Pull hit a conflict - the rebase was aborted, nothing was changed. "
+                      "Resolve it in git, then try again.")
+
+    def _rebase_in_progress(self):
+        git_dir = os.path.join(self.store_dir, ".git")
+        return (os.path.isdir(os.path.join(git_dir, "rebase-merge"))
+                or os.path.isdir(os.path.join(git_dir, "rebase-apply")))
+
+    def _pull_rebase(self):
+        """pull --rebase --autostash. 충돌로 멈추면 rebase --abort 로 되돌리고 (False, 안내) (v01.60)."""
+        ok, out = self._run("pull", "--rebase", "--autostash", self.remote, self.branch)
+        if not ok and self._rebase_in_progress():
+            _ok, out_abort = self._run("rebase", "--abort")
+            out = "\n".join([l for l in (out, out_abort, self.REBASE_ABORTED) if l])
+        return ok, out
+
     def pull(self):
         if not self.is_repo():
             return False, "Not a git repository. Run Init/Clone first."
         ok, msg = self.check_branch()
         if not ok:
             return False, msg
-        return self._run("pull", "--rebase", "--autostash", self.remote, self.branch)
+        return self._pull_rebase()
 
     def push(self, message):
         """이 프로파일 폴더만 커밋 -> 받아서 이어 붙이기 -> 푸시(거절되면 한 번 더)."""
@@ -225,7 +252,7 @@ class GitSync:
 
         ok_push = False
         for _attempt in range(2):
-            ok_pull, out_pull = self._run("pull", "--rebase", "--autostash", self.remote, self.branch)
+            ok_pull, out_pull = self._pull_rebase()
             logs.append(out_pull)
             # 원격에 아직 브랜치가 없으면(첫 푸시) 받기 실패는 무시하고 올린다.
             if not ok_pull and "couldn't find remote ref" not in out_pull.lower():

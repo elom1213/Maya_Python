@@ -1,5 +1,7 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-11-03
+# last Update date : 2026-11-27
+# v01.60 : Path Structure 탭은 프로파일과 무관(라이브러리 · PC 단위 설정) - 프로파일 전환 때 새로고침 안 함,
+#          recreate_to 를 프로파일에 저장하지 않음, File Manager Pull 뒤 그 목록도 다시 읽음.
 # A00210_FileManager - main window (Qt, standalone)
 #
 # Maya 씬 파일(.mb/.ma)의 작업 기록을 관리한다.
@@ -338,8 +340,10 @@ class MainWindow(QWidget):
         self.path_structure_tab = PathStructureTab(
             get_store=self._make_store,
             get_project_root=self.get_project_root,
-            get_store_dir=self.get_store_dir,
+            # v01.60 : 목록 · 저장 위치는 프로파일과 무관한 라이브러리. 프로파일 값은 첫 실행 시드로만.
+            get_seed_prefs=lambda: getattr(self, "_prefs", None),
             log=self.log,
+            on_pulled=self.on_scan,
         )
         self.tabs.addTab(self.path_structure_tab, "Path Structure")
 
@@ -810,8 +814,7 @@ class MainWindow(QWidget):
         self.chk_recorded_only.setChecked(
             bool(self._prefs.get("show_recorded_only", False)))
 
-        # Path Structure 탭의 Recreate 목적지(Project Root 와 별개 값, v01.32).
-        self.path_structure_tab.set_recreate_to(self._prefs.get("recreate_to", ""))
+        # Path Structure 탭의 Recreate To 는 v01.60 부터 프로파일이 아니라 PC 단위 설정(library_settings).
 
         # Source Mode 별 경로를 슬롯에 채우고, 활성 모드 경로를 공유 입력 칸에 로드한다.
         self._path_values["git"] = ui_path(self._prefs.get("store_dir", ""))
@@ -848,7 +851,6 @@ class MainWindow(QWidget):
             "author": self.ipf_author.text().strip(),
             "recursive": self.chk_recursive.isChecked(),
             "show_recorded_only": self.chk_recorded_only.isChecked(),
-            "recreate_to": self.path_structure_tab.recreate_to(),
             **self.sync_tab.prefs_values(),
         }
 
@@ -945,10 +947,12 @@ class MainWindow(QWidget):
         self.log(f"Deleted profile '{name}'. Active is now '{self._profile}'.")
 
     def _refresh_other_tabs(self):
-        """프로파일 전환으로 Store Repo 가 바뀌면 Lineage/Path Structure 목록을 갱신."""
+        """프로파일 전환으로 Store Repo 가 바뀌면 Lineage/Sync 목록을 갱신.
+
+        Path Structure 는 v01.60 부터 프로파일과 무관한 라이브러리라 여기서 새로고침하지 않는다.
+        """
         try:
             self.lineage_tab.on_refresh()
-            self.path_structure_tab.on_refresh()
             self.sync_tab.on_refresh(quiet=True)
         except Exception as exc:  # noqa: BLE001 - 갱신 실패가 전환을 막지 않게
             self.log(f"Tab refresh skipped: {exc}")
@@ -961,6 +965,10 @@ class MainWindow(QWidget):
             pass
         try:
             self._save_current_to_active()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            self.path_structure_tab.save_settings()   # Recreate To 등 PC 단위 설정 (v01.60)
         except Exception:  # noqa: BLE001
             pass
         super().closeEvent(event)
@@ -1554,6 +1562,11 @@ class MainWindow(QWidget):
         self.lbl_git_status.setText("Pull OK" if ok else "Pull failed")
         if ok:
             self.on_scan()
+            # git pull 은 브랜치 전체를 받는다 - 다른 PC 가 올린 구조 · 카테고리도 들어왔을 수 있다 (v01.60).
+            try:
+                self.path_structure_tab.on_refresh()
+            except Exception as exc:  # noqa: BLE001
+                self.log(f"Path Structure refresh skipped: {exc}")
 
     # ------------------------------------------------------------ Sync 탭용 git (v01.47)
 

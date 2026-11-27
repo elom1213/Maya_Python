@@ -1,6 +1,6 @@
 # A00210_FileManager — Path Structure 라이브러리 독립 계획서 (공용 Saved Structures + 카테고리)
 
-> **작성** 2026-11-27 · 상태: **구현 전** · 대상 버전 **v01.60** · 다음 작업 = 7장 결정 확인 → 4장 단계 1부터
+> **작성** 2026-11-27 · 상태: **v01.60 구현 · 시험 완료 (2026-11-27, 7장 기본값 그대로)** — 남은 것: GUI 실기(6장) · 데이터 저장소 푸시(10장)
 > 요청 (사용자, 2026-11-27):
 > 1. Path Structure 탭의 **Saved Structures 를 File Manager 탭의 Profile 과 무관하게 전부** 보이게 한다.
 >    지금은 예를 들어 `Dnable_CH` 가 `Local_CH_D` 프로파일(데이터 폴더 `Dnable`)에서만 보이고 `JUN` · `MUE` 프로파일에서는 안 보인다.
@@ -465,3 +465,29 @@ git 시험은 `tempfile` 안에 `git init --bare remote.git` + 클론 두 개(PC
   카테고리를 읽지 않는다. (이전 스크립트가 옛 **폴더 이름**으로 카테고리 이름을 만드는 것은 일회성 출력 이름이라 해당 없음.)
 - **PySide 버전** — A00210 은 `Framework.qt.qt` 래퍼로 import 한다. 새 위젯도 그 래퍼에서만 가져온다(`QInputDialog.getItem` 포함 확인).
 - **원격 작업은 그 턴 요청 때만** — 이전 커밋 · 코드 커밋 모두 로컬까지. 데이터 저장소 Push 와 Maya_Python Push 는 각각 사용자 지시가 있을 때.
+
+---
+
+## 10. 구현 결과 (v01.60, 2026-11-27)
+
+| 단계 | 결과 |
+|------|------|
+| 1~4 코어 | `path_structure.py`(`category` · `list_entries`) · 새 `structure_library.py` · 새 `library_settings.py` · `git_sync.py`(`scope_rel` · `rebase --abort` · 범위 skeleton) |
+| 5 이전 스크립트 | `tools/A00210_FileManager/dev/migrate_structure_library.py` (A00510 이 `dev` 를 빼므로 릴리즈에 안 들어간다) |
+| 6~7 UI | 탭 = Library 줄(Pull / Push) + 카테고리 트리 + `New Category` · `Rename` · `Delete` · `Move To...` + Save `Category` 콤보. MainWindow 는 프로파일 전환 때 새로고침 안 함 · `recreate_to` 미저장 · Pull 뒤 목록 갱신 · 닫을 때 PC 설정 저장 |
+| 8 시험 | `tests/test_structure_library.py` **51/51**(L14 · S3 · M7 · G6 · U21). 기존 data_folders 43 · export_core 50 · export_ui 32 · file_date 24 · prune 11 · sync_core 65 · sync_depth 22 · sync_junctions 19 · sync_preview 11 · sync_ui(FAIL 0) · ui_paths 29 통과. `test_export_worker` 는 mayapy 전용(표준 python 에서 `maya` 없음 — 이번 변경과 무관) |
+| 9 실제 이전 | 이 PC 데이터 클론: dry-run = 1-2 표와 같은 20개 → `--apply` → **로컬 커밋 `0a11b35`**(24 파일 = 구조 20 + 카테고리 4, `path_structures/` · `profiles/*/path_structures/` 만, records 미커밋 변경은 그대로). 카테고리 id: Dnable `661ac7f0` · JUN `0ca49e97` · MUE `124b2dfd` · SA `7d2cb036`. **원격에는 아직 없음** |
+| 11 문서 | version 01.60 · CHANGELOG · 가이드 §1 · 5-C · 4-C(라이브러리 · 카테고리 · 이전) · §5 · WORKLOG · portfolio EN/KR · 메모리 |
+
+구현 중 바뀐 점 · 알게 된 것:
+- **`library_settings.SETTINGS_PATH` 는 `None` → 호출 시점 `prefs.PREFS_DIR` 아래.** import 때 고정하면 `prefs.PREFS_DIR` 를 임시로 바꾸는 기존 시험이
+  실제 `~/.jun_filemanager/structure_library.json` 을 만들어 버린다. 실제 prefs 로 MainWindow 를 만드는 시험(`test_file_date` · `test_sync_ui`)은 임시 경로를 끼웠다.
+- 시험 헬퍼가 git 출력을 `strip()` 하면 porcelain 첫 줄 ` M` 의 앞 공백이 사라진다 — 상태 판정은 경로 포함 여부로.
+- **스모크 사고**: 실제 프로파일로 창을 띄워 프로파일을 바꿔 본 탓에 `Local_CH_D` · `JUN` · `MUE` 프로파일이 새 코드로 다시 저장되어 `recreate_to` 가 지워졌다
+  (PC 설정 시드로 옮겨질 값). 직전 값은 복구할 수 없다 — 11-04 백업: `Local_CH_D` = `D:/D__02.Art/D__Asset/D__Character/D__CHN_Set_007`, `MUE` = `C:/JUN/JUN_MUE`.
+  첫 실행 때 Recreate To 가 비어 있으면 한 번 다시 적으면 된다(그 뒤로는 PC 설정에 남는다).
+
+남은 것:
+1. GUI 실기 — 6장 체크리스트.
+2. **데이터 저장소 반영** — 툴 Path Structure 탭 `Push`(이전 커밋 `0a11b35` 포함 로컬 커밋 전부가 나간다) 또는 그 턴 요청 시 `git push`. 반영 전에 다른 PC 가 옛 버전으로 저장했으면 스크립트를 다시 돌린다.
+3. 다른 PC — v01.60 설치 → Path Structure `Pull`.

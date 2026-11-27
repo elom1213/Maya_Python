@@ -76,5 +76,12 @@
 #        예전엔 해제한 경로 자신만 빠져서 하위가 체크돼 있으면 부모째 다시 생겼다(사용자 보고).
 #        core.path_structure.prune_excluded, 미리보기는 막힌 하위를 회색 + 툴팁(체크 상태는 유지 - 상위를 켜면 복귀).
 
-VERSION = "01.59"
-LAST_UPDATE = "2026-11-25"
+# 01.60  Path Structure - Saved Structures 를 File Manager 프로파일에서 독립. 저장 위치 <Store Repo>/profiles/<folder>/path_structures
+#        -> 저장소 루트 path_structures/ (모든 프로파일 · PC 가 같은 목록). 사용자 카테고리(New Category · Rename · Delete · Move To...,
+#        카테고리 하나 = _categories/<id>.json, 구조는 category id). 탭 전용 Pull / Push(path_structures/ 만 커밋).
+#        라이브러리 경로 · Recreate To 는 PC 단위 ~/.jun_filemanager/structure_library.json(첫 실행 때 활성 프로파일 값으로).
+#        GitSync: scope_rel, pull --rebase 충돌 시 rebase --abort. 일회성 이전 dev/migrate_structure_library.py.
+#        계획 docs/plans/A00210_FileManager_structure_library_plan.md
+
+VERSION = "01.60"
+LAST_UPDATE = "2026-11-27"

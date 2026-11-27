@@ -1,11 +1,11 @@
 # Python Script by Ji Hun Park
-# last Update date : 2026-08-03
+# last Update date : 2026-11-27
 # A00210_FileManager - "Path Structure" tab (Qt)
 #
-# 베이스 폴더의 하위 폴더 구조를 캡처해 store_dir 에 JSON 으로 저장하고(다른 PC 와 git 동기화),
+# 베이스 폴더의 하위 폴더 구조를 캡처해 라이브러리(<repo>/path_structures)에 JSON 으로 저장하고(다른 PC 와 git 동기화),
 # 다른 PC 에서 그 PC 의 project_root 아래에 재생성한다.
 #
-# project_root / store_dir / 로그는 MainWindow 에서 콜러블로 주입받는다(단일 소스 유지).
+# project_root / 로그는 MainWindow 에서 콜러블로 주입받는다(단일 소스 유지). 라이브러리 위치는 v01.60 부터 탭이 직접 관리.
 #
 # v01.29 : 파일도 함께 캡처/재생성. 두 지점에 체크박스(둘 다 기본 켬) —
 #          저장 쪽 "Include files"(캡처가 파일 목록도 기록) / 재생성 쪽 "Create files"
@@ -15,9 +15,14 @@
 #          경로에 생성한다. 값은 프로파일에 따로 저장돼 다음 실행에 복원된다.
 # v01.33 : Capture 도 Project Root 와 무관하다 - Base Folder 가 어느 경로든 캡처한다
 #          (예전엔 Project Root 가 비었거나 Base Folder 가 그 밖이면 막았다).
+# v01.60 : Saved Structures 를 File Manager 프로파일에서 독립 - 저장소 루트 path_structures/ 의 라이브러리
+#          (core.structure_library). 프로파일 · Source Mode · Data Folder 를 바꿔도 목록이 그대로다.
+#          목록 = 카테고리 트리(New Category · Rename · Delete · Move To...), 이 탭 전용 Pull / Push
+#          (path_structures/ 만 올린다). 라이브러리 경로 · Recreate To 는 PC 단위 설정(core.library_settings).
 
 import os
 import time
+import getpass
 
 from Framework.qt.MOD_treeExpand_qt_v01 import JUN_mod_treeExpand_qt_v01
 from Framework.qt import JUN_mod_checkList_qt
@@ -31,6 +36,7 @@ from Framework.qt.qt import (
     QGroupBox,
     QLabel,
     QLineEdit,
+    QComboBox,
     QPushButton,
     QCheckBox,
     QSpinBox,
@@ -50,7 +56,15 @@ from Framework.qt.qt import (
 )
 
 from ..core import path_structure as ps_mod
-from ..core.paths import ui_path
+from ..core import structure_library as lib_mod
+from ..core import library_settings as lset_mod
+from ..core.git_sync import GitSync
+from ..core.paths import ui_path, ui_text
+
+# 트리 항목 종류 (UserRole 의 첫 값)
+KIND_CAT = "cat"
+KIND_STRUCT = "struct"
+UNCAT_KEY = "__uncategorized__"   # Uncategorized 가상 노드의 id 자리
 
 
 class PathStructureTab(QWidget):
@@ -65,13 +79,21 @@ class PathStructureTab(QWidget):
         "QPushButton:disabled { background-color: #4b5b4c; color: #9aa; }"
     )
 
-    def __init__(self, get_store, get_project_root, get_store_dir, log):
+    def __init__(self, get_store, get_project_root, get_seed_prefs, log, on_pulled=None):
         super().__init__()
 
+        # get_store / get_project_root 는 Capture 의 base_rel(정보용)과 Preview 의 디스크 파일 위치에만 쓴다.
+        # 목록 · 저장 위치는 프로파일과 무관한 라이브러리(v01.60).
         self._get_store = get_store              # () -> MetaStore
         self._get_project_root = get_project_root  # () -> str
-        self._get_store_dir = get_store_dir        # () -> str
         self._log = log                            # (msg) -> None
+        self._on_pulled = on_pulled                # () -> None, 탭 Pull 성공 뒤(File Manager 목록 재스캔)
+
+        # PC 단위 설정(없으면 활성 프로파일 값으로 한 번 채움) + 라이브러리
+        seed = get_seed_prefs() if callable(get_seed_prefs) else None
+        self._settings = lset_mod.load(seed)
+        self._lib = lib_mod.StructureLibrary(self._settings.get("repo_dir", ""))
+        self._legacy_warned = False
 
         self._pending = None                       # Capture 했으나 아직 저장 안 한 PathStructure
         self._scanned_base = None                   # 폴더 체크리스트를 마지막으로 스캔한 base 경로
@@ -145,7 +167,13 @@ class PathStructureTab(QWidget):
         name_row = QHBoxLayout()
         self.ipf_name = QLineEdit()
         name_row.addWidget(QLabel("Name"))
-        name_row.addWidget(self.ipf_name)
+        name_row.addWidget(self.ipf_name, stretch=1)
+        # 저장할 카테고리 (v01.60). 기본 = 트리에서 지금 고른 카테고리.
+        name_row.addWidget(QLabel("Category"))
+        self.cmb_category = QComboBox()
+        self.cmb_category.setMinimumWidth(140)
+        self.cmb_category.setToolTip("Category to save the structure in.")
+        name_row.addWidget(self.cmb_category)
         layout.addLayout(name_row)
 
         # Capture Depth + Capture + Save
@@ -186,25 +214,62 @@ class PathStructureTab(QWidget):
         group = QGroupBox("Saved Structures")
         layout = QVBoxLayout(group)
 
-        self.list_structs = QListWidget()
-        self.list_structs.currentItemChanged.connect(self.on_select_structure)
-        # 목록은 짧게(약 1/3), 나머지 세로 공간은 Preview 트리에 준다.
-        self.list_structs.setMaximumHeight(120)
-        layout.addWidget(self.list_structs, stretch=0)
+        # Library 줄 (v01.60) - 프로파일과 무관한 라이브러리 위치 + 이 탭 전용 Pull / Push.
+        lib_row = QHBoxLayout()
+        lib_row.addWidget(QLabel("Library"))
+        self.lbl_library = QLabel()
+        self.lbl_library.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        lib_row.addWidget(self.lbl_library, stretch=1)
+        btn_lib_browse = QPushButton("Browse...")
+        btn_lib_browse.setToolTip("Pick the local clone of the data repo that holds the library.\n"
+                                  "Saved per PC - not part of any File Manager profile.")
+        btn_lib_browse.clicked.connect(self.on_browse_library)
+        lib_row.addWidget(btn_lib_browse)
+        self.btn_pull = QPushButton("Pull")
+        self.btn_pull.setToolTip("Get the latest saved structures and categories.\n"
+                                 "(git pulls the whole branch - File Manager records may update too.)")
+        self.btn_pull.clicked.connect(self.on_pull)
+        self.btn_push = QPushButton("Push")
+        self.btn_push.setToolTip("Share saved structures and categories.\n"
+                                 "Only the path_structures folder is committed - nothing else.")
+        self.btn_push.clicked.connect(self.on_push)
+        lib_row.addWidget(self.btn_pull)
+        lib_row.addWidget(self.btn_push)
+        self.lbl_lib_status = QLabel("")
+        lib_row.addWidget(self.lbl_lib_status)
+        layout.addLayout(lib_row)
 
-        # 관리 버튼(Refresh/Rename/Delete)은 왼쪽에, 실제로 폴더를 '생성'하는 Recreate 는
+        # 카테고리 트리: 최상위 = 카테고리, 자식 = 구조.
+        self.tree_structs = QTreeWidget()
+        self.tree_structs.setHeaderHidden(True)
+        self.tree_structs.setColumnCount(1)
+        self.tree_structs.setSelectionMode(QAbstractItemView.ExtendedSelection)
+        JUN_mod_treeExpand_qt_v01(self.tree_structs)
+        self.tree_structs.currentItemChanged.connect(self.on_select_structure)
+        self.tree_structs.itemSelectionChanged.connect(self._update_buttons)
+        self.tree_structs.itemExpanded.connect(self._on_cat_expand_changed)
+        self.tree_structs.itemCollapsed.connect(self._on_cat_expand_changed)
+        self.tree_structs.setMaximumHeight(200)
+        layout.addWidget(self.tree_structs, stretch=0)
+
+        # 관리 버튼은 왼쪽에, 실제로 폴더를 '생성'하는 Recreate 는
         # 색을 달리해 오른쪽에 따로 둔다(파괴/생성 동작을 시각적으로 구분).
         btn_row = QHBoxLayout()
         btn_refresh = QPushButton("Refresh")
         btn_refresh.clicked.connect(self.on_refresh)
-        btn_rename = QPushButton("Rename")
-        btn_rename.setToolTip("Rename the selected saved structure.")
-        btn_rename.clicked.connect(self.on_rename)
-        btn_delete = QPushButton("Delete")
-        btn_delete.clicked.connect(self.on_delete)
-        btn_row.addWidget(btn_refresh)
-        btn_row.addWidget(btn_rename)
-        btn_row.addWidget(btn_delete)
+        btn_new_cat = QPushButton("New Category")
+        btn_new_cat.clicked.connect(self.on_new_category)
+        self.btn_rename = QPushButton("Rename")
+        self.btn_rename.setToolTip("Rename the selected category or structure.")
+        self.btn_rename.clicked.connect(self.on_rename)
+        self.btn_delete = QPushButton("Delete")
+        self.btn_delete.setToolTip("Delete the selected category or structure(s).")
+        self.btn_delete.clicked.connect(self.on_delete)
+        self.btn_move = QPushButton("Move To...")
+        self.btn_move.setToolTip("Move the selected structure(s) to another category.")
+        self.btn_move.clicked.connect(self.on_move_to)
+        for b in (btn_refresh, btn_new_cat, self.btn_rename, self.btn_delete, self.btn_move):
+            btn_row.addWidget(b)
         btn_row.addStretch(1)
 
         self.btn_recreate = QPushButton("Recreate")
@@ -223,10 +288,12 @@ class PathStructureTab(QWidget):
         self.ipf_recreate_to.setPlaceholderText("Destination base folder for Recreate")
         self.ipf_recreate_to.setToolTip(
             "Destination base folder. Checked folders are created directly inside it.\n"
-            "Independent of the Project Root (File Manager tab) - selecting a structure "
-            "never changes this field.")
+            "Independent of the Project Root and profiles (File Manager tab) - saved per PC,\n"
+            "selecting a structure never changes this field.")
+        self.ipf_recreate_to.setText(ui_path(self._settings.get("recreate_to", "")))
+        self.ipf_recreate_to.editingFinished.connect(self.save_settings)
         btn_recreate_browse = QPushButton("Browse...")
-        btn_recreate_browse.clicked.connect(lambda: self._browse_dir(self.ipf_recreate_to))
+        btn_recreate_browse.clicked.connect(self._on_browse_recreate_to)
         recreate_row.addWidget(self.ipf_recreate_to)
         recreate_row.addWidget(btn_recreate_browse)
         layout.addLayout(recreate_row)
@@ -296,12 +363,137 @@ class PathStructureTab(QWidget):
     # ============================================================ helpers
 
     def recreate_to(self):
-        """'Recreate To' 칸 값. MainWindow 가 프로파일에 저장할 때 읽는다."""
+        """'Recreate To' 칸 값."""
         return ui_path(self.ipf_recreate_to.text())
 
-    def set_recreate_to(self, path):
-        """프로파일에서 복원한 'Recreate To' 값을 칸에 넣는다."""
-        self.ipf_recreate_to.setText(ui_path(path))
+    def library(self):
+        return self._lib
+
+    def save_settings(self):
+        """PC 단위 설정 저장(Recreate To · 라이브러리 경로 · 펼친 카테고리). 프로파일과 무관 (v01.60)."""
+        self._settings["recreate_to"] = self.recreate_to()
+        self._settings["repo_dir"] = ui_path(self._lib.repo_dir)
+        try:
+            lset_mod.save(self._settings)
+        except OSError as exc:
+            self._log(f"[Warning] Could not save Path Structure settings: {exc}")
+
+    def _on_browse_recreate_to(self):
+        self._browse_dir(self.ipf_recreate_to)
+        self.save_settings()
+
+    def _update_library_label(self):
+        lib_dir = self._lib.lib_dir()
+        self.lbl_library.setText(ui_path(lib_dir) if lib_dir else "(not set)")
+        self.lbl_library.setToolTip(
+            "Saved structures of every profile live here (repo root / path_structures).\n"
+            "Repo clone: " + (ui_path(self._lib.repo_dir) or "(not set)"))
+
+    def _set_repo_dir(self, repo_dir):
+        self._lib = lib_mod.StructureLibrary(repo_dir)
+        self._legacy_warned = False
+        self.save_settings()
+        self._update_library_label()
+
+    def on_browse_library(self):
+        start = self._lib.repo_dir or os.path.expanduser("~")
+        path = QFileDialog.getExistingDirectory(self, "Select Library Repo (data repo clone)", start)
+        if not path:
+            return
+        if not os.path.isdir(os.path.join(path, ".git")):
+            QMessageBox.information(
+                self, "Path Structure",
+                "Not a git clone. Pull will clone the data repo here if the folder is empty.")
+        self._set_repo_dir(path)
+        self._log("Path Structure library: " + (ui_path(self._lib.lib_dir()) or "(not set)"))
+        self.on_refresh()
+
+    # ------------------------------------------------------- tree selection
+
+    def _current_info(self):
+        """현재 항목 (kind, key) - kind 는 KIND_CAT / KIND_STRUCT, 없으면 (None, None)."""
+        item = self.tree_structs.currentItem()
+        if item is None:
+            return None, None
+        data = item.data(0, Qt.UserRole)
+        if not data:
+            return None, None
+        return data[0], data[1]
+
+    def _selected_struct_names(self):
+        names = []
+        for it in self.tree_structs.selectedItems():
+            data = it.data(0, Qt.UserRole)
+            if data and data[0] == KIND_STRUCT:
+                names.append(data[1])
+        return names
+
+    def _current_category_id(self):
+        """지금 고른 카테고리 id - 카테고리 노드면 그 id, 구조면 그 구조의 카테고리. 없으면 None."""
+        kind, key = self._current_info()
+        if kind == KIND_CAT:
+            return lib_mod.UNCATEGORIZED if key == UNCAT_KEY else key
+        if kind == KIND_STRUCT:
+            item = self.tree_structs.currentItem()
+            parent = item.parent() if item is not None else None
+            if parent is not None:
+                pdata = parent.data(0, Qt.UserRole)
+                if pdata and pdata[0] == KIND_CAT:
+                    return lib_mod.UNCATEGORIZED if pdata[1] == UNCAT_KEY else pdata[1]
+        return None
+
+    def _update_buttons(self):
+        kind, key = self._current_info()
+        names = self._selected_struct_names()
+        is_uncat = (kind == KIND_CAT and key == UNCAT_KEY)
+        self.btn_rename.setEnabled(kind is not None and not is_uncat)
+        self.btn_delete.setEnabled(kind is not None and not is_uncat)
+        self.btn_move.setEnabled(bool(names))
+
+    def _on_cat_expand_changed(self, item):
+        if getattr(self, "_filling_tree", False):
+            return
+        expanded = []
+        for i in range(self.tree_structs.topLevelItemCount()):
+            it = self.tree_structs.topLevelItem(i)
+            if it.isExpanded():
+                expanded.append(it.data(0, Qt.UserRole)[1])
+        self._settings["expanded"] = expanded
+        self.save_settings()
+
+    def _fill_category_combo(self, select_id=None):
+        """Save 그룹의 Category 콤보. select_id None = 지금 값 유지."""
+        keep = self.cmb_category.currentData() if select_id is None else select_id
+        self.cmb_category.blockSignals(True)
+        self.cmb_category.clear()
+        for cat in self._lib.list_categories():
+            self.cmb_category.addItem(cat.name, cat.id)
+        self.cmb_category.addItem(lib_mod.UNCATEGORIZED_LABEL, lib_mod.UNCATEGORIZED)
+        idx = self.cmb_category.findData(keep) if keep is not None else -1
+        self.cmb_category.setCurrentIndex(idx if idx >= 0 else 0)
+        self.cmb_category.blockSignals(False)
+
+    def _category_choices(self):
+        """[(이름, id)] - 카테고리 + Uncategorized(맨 뒤)."""
+        out = [(c.name, c.id) for c in self._lib.list_categories()]
+        out.append((lib_mod.UNCATEGORIZED_LABEL, lib_mod.UNCATEGORIZED))
+        return out
+
+    def _author(self):
+        try:
+            user = getpass.getuser()
+        except Exception:  # noqa: BLE001
+            user = ""
+        return user or "unknown"
+
+    def _need_library(self):
+        if not self._lib.repo_dir:
+            QMessageBox.warning(self, "Path Structure",
+                                "Set the Library folder first (Browse... in Saved Structures).")
+            return False
+        return True
+
+    SYNC_HINT = "use Push in the Saved Structures group to share it."
 
     def _browse_dir(self, line_edit):
         start = line_edit.text().strip() or os.path.expanduser("~")
@@ -378,8 +570,9 @@ class PathStructureTab(QWidget):
         self.chk_all.blockSignals(False)
 
     def _selected_name(self):
-        item = self.list_structs.currentItem()
-        return item.text() if item is not None else ""
+        """현재 항목이 구조면 그 이름, 아니면 ""."""
+        kind, key = self._current_info()
+        return key if kind == KIND_STRUCT else ""
 
     @staticmethod
     def _now_iso():
@@ -414,9 +607,11 @@ class PathStructureTab(QWidget):
         self._pending = structure
 
         # 캡처 결과를 (미저장 상태로) preview 에 보여준다. 목록 선택은 해제.
-        self.list_structs.blockSignals(True)
-        self.list_structs.setCurrentRow(-1)
-        self.list_structs.blockSignals(False)
+        self.tree_structs.blockSignals(True)
+        self.tree_structs.setCurrentItem(None)
+        self.tree_structs.clearSelection()
+        self.tree_structs.blockSignals(False)
+        self._update_buttons()
         self._show_preview(structure, base_abs=base)
         self._log(
             f"Captured {len(structure.folders)} folder(s), {len(structure.files)} file(s) "
@@ -428,13 +623,13 @@ class PathStructureTab(QWidget):
             return
 
         name = self.ipf_name.text().strip()
-        store_dir = self._get_store_dir()
+        cat_id = self.cmb_category.currentData() or lib_mod.UNCATEGORIZED
+        cat_name = self.cmb_category.currentText() or lib_mod.UNCATEGORIZED_LABEL
 
         if not name:
             QMessageBox.warning(self, "Path Structure", "Enter a name.")
             return
-        if not store_dir:
-            QMessageBox.warning(self, "Path Structure", "Set Store Repo first (File Manager tab).")
+        if not self._need_library():
             return
 
         if not self._pending.folders and not self._pending.files:
@@ -447,52 +642,123 @@ class PathStructureTab(QWidget):
             if ok != QMessageBox.Yes:
                 return
 
-        if ps_mod.exists(store_dir, name):
+        if self._lib.exists(name):
             ok = QMessageBox.question(
                 self,
                 "Path Structure",
-                f"A structure named '{name}' already exists. Overwrite?",
+                f"A structure named '{name}' already exists. Overwrite?\n"
+                f"It will be saved in category '{cat_name}'.",
             )
             if ok != QMessageBox.Yes:
                 return
 
         self._pending.name = name
+        self._pending.category = cat_id
+        self._pending.created_by = self._pending.created_by or self._author()
         self._pending.created_at = self._now_iso()
 
-        path = ps_mod.save(store_dir, self._pending)
-        self._log(f"Path structure saved: {path} "
-                  f"({len(self._pending.folders)} folder(s), "
-                  f"{len(self._pending.files)} file(s))")
-        self._log("Saved locally - use Push on the File Manager tab to sync.")
+        path = self._lib.save(self._pending)
+        self._log(ui_text(f"Path structure saved: {path} [{cat_name}] "
+                          f"({len(self._pending.folders)} folder(s), "
+                          f"{len(self._pending.files)} file(s))"))
+        self._log("Saved locally - " + self.SYNC_HINT)
         self._pending = None
         self.on_refresh(select=name)
 
     # ============================================================== list/view
 
-    def on_refresh(self, select=None):
-        names = ps_mod.list_names(self._get_store_dir())
+    def on_refresh(self, select=None, select_cat=None):
+        """라이브러리를 다시 읽어 카테고리 트리를 채운다.
 
-        keep = select if select is not None else self._selected_name()
+        select     : 고를 구조 이름. None 이면 지금 선택(구조 / 카테고리) 유지.
+        select_cat : 고를 카테고리 id (select 가 없을 때).
+        """
+        self._update_library_label()
 
-        self.list_structs.blockSignals(True)
-        self.list_structs.clear()
-        self.list_structs.addItems(names)
-        self.list_structs.blockSignals(False)
+        if select is None and select_cat is None:
+            kind, key = self._current_info()
+            if kind == KIND_STRUCT:
+                select = key
+            elif kind == KIND_CAT:
+                select_cat = key
 
-        if keep and keep in names:
-            self.list_structs.setCurrentRow(names.index(keep))
-        elif names:
-            self.list_structs.setCurrentRow(0)
+        groups = self._lib.grouped()
+        expanded = self._settings.get("expanded")
+        expanded = None if expanded is None else set(expanded)
+
+        self._filling_tree = True
+        tree = self.tree_structs
+        tree.blockSignals(True)
+        tree.clear()
+        target = None
+        first_struct = None
+        for cat, names in groups:
+            key = cat.id if cat is not None else UNCAT_KEY
+            label = cat.name if cat is not None else lib_mod.UNCATEGORIZED_LABEL
+            cat_item = QTreeWidgetItem([f"{label}  ({len(names)})"])
+            cat_item.setData(0, Qt.UserRole, (KIND_CAT, key))
+            cat_item.setIcon(0, self._icon_dir)
+            font = cat_item.font(0)
+            font.setBold(True)
+            cat_item.setFont(0, font)
+            cat_item.setFlags(cat_item.flags() & ~Qt.ItemIsUserCheckable)
+            if cat is None:
+                cat_item.setForeground(0, self._brush_unrecorded)
+                cat_item.setToolTip(0, "Structures without a category (or whose category was deleted).")
+            elif cat.created_by or cat.created_at:
+                cat_item.setToolTip(0, f"Category '{cat.name}' - created by {cat.created_by or '?'} "
+                                       f"{cat.created_at}".rstrip())
+            tree.addTopLevelItem(cat_item)
+            if select_cat is not None and key == select_cat and select is None:
+                target = cat_item
+            for name in names:
+                it = QTreeWidgetItem([name])
+                it.setData(0, Qt.UserRole, (KIND_STRUCT, name))
+                it.setIcon(0, self._icon_file)
+                it.setFlags(it.flags() & ~Qt.ItemIsUserCheckable)
+                cat_item.addChild(it)
+                if first_struct is None:
+                    first_struct = it
+                if select and name == select:
+                    target = it
+            # 펼침: 저장된 목록이 없으면 전부 펼침. 선택할 구조가 든 카테고리는 늘 펼친다.
+            cat_item.setExpanded(expanded is None or key in expanded
+                                 or (target is not None and target.parent() is cat_item))
+        tree.blockSignals(False)
+        self._filling_tree = False
+
+        if target is None:
+            target = first_struct
+        if target is not None:
+            tree.setCurrentItem(target)       # currentItemChanged -> Preview
+            tree.scrollToItem(target)
         else:
             self._clear_preview()
+        self._fill_category_combo(self._current_category_id())
+        self._update_buttons()
+        self._warn_legacy()
+
+    def _warn_legacy(self):
+        if self._legacy_warned:
+            return
+        legacy = self._lib.legacy_files()
+        if legacy:
+            self._legacy_warned = True
+            self._log(f"[Warning] {len(legacy)} structure(s) still in the old per-profile folders "
+                      f"(profiles/*/path_structures). Run the migration "
+                      f"(dev/migrate_structure_library.py, see docs) - they are not listed here.")
 
     def on_select_structure(self, *_):
+        self._update_buttons()
+        cat_id = self._current_category_id()
+        if cat_id is not None:
+            self._fill_category_combo(cat_id)
         name = self._selected_name()
         if not name:
             self._clear_preview()
             return
 
-        structure = ps_mod.load(self._get_store_dir(), name)
+        structure = self._lib.load(name)
         if structure is None:
             self._clear_preview()
             return
@@ -750,7 +1016,7 @@ class PathStructureTab(QWidget):
                 "Set the 'Recreate To' destination folder first.")
             return
 
-        structure = ps_mod.load(self._get_store_dir(), name)
+        structure = self._lib.load(name)
         if structure is None:
             QMessageBox.warning(self, "Path Structure", "Structure not found (refresh).")
             self.on_refresh()
@@ -798,19 +1064,84 @@ class PathStructureTab(QWidget):
                     f"{len(result.existing_files)} already existed.")
         QMessageBox.information(self, "Path Structure", msg)
 
+    # ============================================================ categories
+
+    def on_new_category(self):
+        if not self._need_library():
+            return
+        raw, ok = QInputDialog.getText(self, "New Category", "Category name:")
+        if not ok:
+            return
+        try:
+            cat = self._lib.create_category(raw, author=self._author())
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Path Structure", f"Could not create the category: {exc}")
+            return
+        self._log(f"Category created: {cat.name}")
+        self._log("Created locally - " + self.SYNC_HINT)
+        self.on_refresh(select_cat=cat.id)
+
+    def on_move_to(self):
+        names = self._selected_struct_names()
+        if not names:
+            QMessageBox.warning(self, "Path Structure", "Select one or more structures first.")
+            return
+        choices = self._category_choices()
+        labels = [c[0] for c in choices]
+        cur = self._current_category_id()
+        cur_idx = next((i for i, c in enumerate(choices) if c[1] == cur), 0)
+        label, ok = QInputDialog.getItem(
+            self, "Move To Category",
+            f"Move {len(names)} structure(s) to:", labels, cur_idx, False)
+        if not ok or label not in labels:
+            return
+        cat_id = choices[labels.index(label)][1]
+        try:
+            moved = self._lib.set_category(names, cat_id)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Path Structure", f"Move failed: {exc}")
+            return
+        self._log(f"Moved {len(moved)} structure(s) to '{label}': {', '.join(moved) if moved else '(already there)'}")
+        if moved:
+            self._log("Moved locally - " + self.SYNC_HINT)
+        self.on_refresh(select=names[0])
+
     # ================================================================ rename
 
     def on_rename(self):
-        old = self._selected_name()
-        if not old:
-            QMessageBox.warning(self, "Path Structure", "Select a structure first.")
-            return
+        kind, key = self._current_info()
+        if kind == KIND_CAT:
+            self._rename_category(key)
+        elif kind == KIND_STRUCT:
+            self._rename_structure(key)
+        else:
+            QMessageBox.warning(self, "Path Structure", "Select a category or a structure first.")
 
-        store_dir = self._get_store_dir()
-        if not store_dir:
-            QMessageBox.warning(self, "Path Structure", "Set Store Repo first (File Manager tab).")
+    def _rename_category(self, cat_id):
+        if cat_id == UNCAT_KEY:
             return
+        cat = self._lib.get_category(cat_id)
+        if cat is None:
+            self.on_refresh()
+            return
+        new, ok = QInputDialog.getText(self, "Rename Category", "New name:", text=cat.name)
+        if not ok:
+            return
+        new = new.strip()
+        if not new or new == cat.name:
+            return
+        try:
+            self._lib.rename_category(cat_id, new)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Path Structure", f"Rename failed: {exc}")
+            return
+        self._log(f"Category renamed: {cat.name} -> {new}")
+        self._log("Renamed locally - " + self.SYNC_HINT)
+        self.on_refresh(select_cat=cat_id)
 
+    def _rename_structure(self, old):
+        if not self._need_library():
+            return
         new, ok = QInputDialog.getText(
             self, "Rename Structure", "New name:", text=old)
         if not ok:
@@ -820,27 +1151,162 @@ class PathStructureTab(QWidget):
             return
 
         try:
-            ps_mod.rename(store_dir, old, new)
+            self._lib.rename(old, new)
         except (OSError, ValueError) as exc:
             QMessageBox.warning(self, "Path Structure", f"Rename failed: {exc}")
             return
 
         self._log(f"Path structure renamed: {old} -> {new}")
-        self._log("Renamed locally - use Push on the File Manager tab to sync.")
+        self._log("Renamed locally - " + self.SYNC_HINT)
         self.on_refresh(select=new)
 
     # ================================================================ delete
 
     def on_delete(self):
-        name = self._selected_name()
-        if not name:
-            QMessageBox.warning(self, "Path Structure", "Select a structure first.")
+        kind, key = self._current_info()
+        if kind == KIND_CAT:
+            self._delete_category(key)
+            return
+        names = self._selected_struct_names()
+        if not names:
+            QMessageBox.warning(self, "Path Structure", "Select a category or a structure first.")
             return
 
-        ok = QMessageBox.question(self, "Path Structure", f"Delete structure '{name}'?")
+        if len(names) == 1:
+            text = f"Delete structure '{names[0]}'?"
+        else:
+            text = f"Delete {len(names)} structures?\n" + "\n".join(names)
+        ok = QMessageBox.question(self, "Path Structure", text)
         if ok != QMessageBox.Yes:
             return
 
-        ps_mod.delete(self._get_store_dir(), name)
-        self._log(f"Path structure deleted: {name}")
-        self.on_refresh()
+        cat_id = self._current_category_id()
+        for name in names:
+            self._lib.delete(name)
+            self._log(f"Path structure deleted: {name}")
+        self._log("Deleted locally - " + self.SYNC_HINT)
+        self._clear_preview()
+        self.tree_structs.setCurrentItem(None)
+        self.on_refresh(select_cat=(UNCAT_KEY if cat_id == lib_mod.UNCATEGORIZED else cat_id)
+                        if cat_id is not None else None)
+
+    def _delete_category(self, cat_id):
+        if cat_id == UNCAT_KEY:
+            return
+        cat = self._lib.get_category(cat_id)
+        if cat is None:
+            self.on_refresh()
+            return
+        names = [n for n, c in self._lib.list_structures() if c == cat_id]
+
+        if not names:
+            ok = QMessageBox.question(self, "Path Structure", f"Delete the empty category '{cat.name}'?")
+            if ok != QMessageBox.Yes:
+                return
+            mode = "move"
+        else:
+            box = QMessageBox(self)
+            box.setIcon(QMessageBox.Warning)
+            box.setWindowTitle("Path Structure")
+            box.setText(f"Category '{cat.name}' has {len(names)} structure(s).")
+            box.setInformativeText(
+                "Move them to Uncategorized, or delete them together with the category?\n"
+                "Deleting structures cannot be undone in the tool.")
+            btn_move = box.addButton("Move to Uncategorized", QMessageBox.AcceptRole)
+            btn_del = box.addButton("Delete Structures Too", QMessageBox.DestructiveRole)
+            box.addButton(QMessageBox.Cancel)
+            box.setDefaultButton(btn_move)
+            box.exec_()
+            clicked = box.clickedButton()
+            if clicked is btn_move:
+                mode = "move"
+            elif clicked is btn_del:
+                mode = "delete"
+            else:
+                return
+
+        try:
+            affected = self._lib.delete_category(cat_id, mode=mode)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Path Structure", f"Delete failed: {exc}")
+            return
+        if mode == "delete":
+            self._log(f"Category deleted: {cat.name} (with {len(affected)} structure(s))")
+        else:
+            self._log(f"Category deleted: {cat.name} ({len(affected)} structure(s) moved to "
+                      f"{lib_mod.UNCATEGORIZED_LABEL})")
+        self._log("Deleted locally - " + self.SYNC_HINT)
+        self._clear_preview()
+        self.tree_structs.setCurrentItem(None)
+        self.on_refresh(select_cat=UNCAT_KEY if (mode == "move" and affected) else None)
+
+    # ============================================================ pull / push
+
+    def _make_git(self):
+        s = self._settings
+        return GitSync(self._lib.repo_dir, s.get("remote"), s.get("branch"),
+                       scope_rel=lib_mod.LIB_DIR)
+
+    def _ready_git(self):
+        """Pull / Push 전 검사(라이브러리 경로 · 클론 · 브랜치). 통과하면 GitSync, 아니면 None."""
+        if not self._need_library():
+            return None
+        git = self._make_git()
+        if not git.is_repo():
+            if os.path.isdir(git.store_dir) and os.listdir(git.store_dir):
+                msg = "The Library folder is not a git clone (and not empty) - pick the data repo clone."
+                self._log("[Warning] " + msg)
+                QMessageBox.warning(self, "Path Structure", msg)
+                return None
+            ok, out = git.ensure_repo(self._settings.get("remote_url", ""))
+            self._log(ui_text(out))
+            if not ok:
+                self.lbl_lib_status.setText("Clone failed")
+                return None
+        ok, msg = git.check_branch()
+        if not ok:
+            self._log("[Warning] " + msg + " (use 'Switch to ...' on the File Manager tab)")
+            self.lbl_lib_status.setText("Wrong branch")
+            return None
+        return git
+
+    def _set_git_busy(self, busy):
+        self.btn_pull.setEnabled(not busy)
+        self.btn_push.setEnabled(not busy)
+
+    def on_pull(self):
+        git = self._ready_git()
+        if git is None:
+            return
+        self._set_git_busy(True)
+        try:
+            ok, out = git.pull()
+        finally:
+            self._set_git_busy(False)
+        self._log(ui_text(out) or ("Pull OK" if ok else "Pull failed"))
+        self.lbl_lib_status.setText("Pull OK" if ok else "Pull failed")
+        if ok:
+            self._legacy_warned = False
+            self.on_refresh()
+            if callable(self._on_pulled):
+                try:
+                    self._on_pulled()
+                except Exception as exc:  # noqa: BLE001 - 다른 탭 갱신 실패가 Pull 결과를 가리지 않게
+                    self._log(f"Refresh after pull skipped: {exc}")
+
+    def on_push(self):
+        git = self._ready_git()
+        if git is None:
+            return
+        pc = os.environ.get("COMPUTERNAME", "")
+        message = "Update path structures by {0}{1} ({2}) [{3}]".format(
+            self._author(), " on " + pc if pc else "", self._now_iso(), lib_mod.LIB_DIR)
+        self._set_git_busy(True)
+        try:
+            ok, out = git.push(message)
+        finally:
+            self._set_git_busy(False)
+        self._log(ui_text(out) or ("Push OK" if ok else "Push failed"))
+        self.lbl_lib_status.setText("Push OK" if ok else "Push failed")
+        if ok:
+            self.on_refresh()

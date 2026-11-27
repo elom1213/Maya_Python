@@ -2,7 +2,7 @@
 title: 작업 일지 (WORKLOG)
 aliases: [WORKLOG, 작업일지, devlog]
 tags: [worklog, maya-python]
-updated: 2026-11-26
+updated: 2026-11-27
 ---
 
 # 작업 일지 (WORKLOG)
@@ -31,7 +31,20 @@ git 커밋 기록을 근거로 하루 작업을 요약한다. 최신 날짜가 �
 
 ---
 
-## 2026-11-26 (오늘)
+## 2026-11-27 (오늘)
+
+> [!summary] **`A00210_FileManager` v01.60 — Path Structure 라이브러리 독립 (프로파일 무관 · 카테고리 · 탭 전용 Pull/Push)** `#A00210_FileManager`
+- 요청: Saved Structures 를 File Manager Profile 과 무관하게 전부 보이게, 그것만 따로 Push / Pull, 사용자 카테고리(생성 · 삭제 · 이름 바꾸기, 역시 Push / Pull).
+  원인: 구조가 `profiles/<Data Folder>/path_structures/` 에 있어 `Dnable_CH` 는 Data Folder `Dnable` 프로파일(`Local_CH_D` 등)에서만 보였다.
+- 계획서 `docs/plans/A00210_FileManager_structure_library_plan.md`(기본값 D1~D8 그대로 진행).
+- 저장 위치 = 저장소 루트 `path_structures/`. 카테고리 하나 = `_categories/<id>.json`, 구조 JSON `category` = id(이름 바꾸기 = 파일 하나, 동시 추가 충돌 없음).
+  목록 = 카테고리 트리 + `New Category` · `Rename` · `Delete`(3지선다) · `Move To...`, Save 그룹 `Category` 콤보. 탭 전용 `Pull` / `Push`(`path_structures/` 만 커밋).
+  라이브러리 경로 · Recreate To = PC 단위 `~/.jun_filemanager/structure_library.json`(첫 실행 때 활성 프로파일로). 프로파일 전환 때 목록 새로고침 안 함.
+- `GitSync`: `scope_rel` + pull --rebase 충돌 시 `rebase --abort`(예전엔 클론이 rebase 중으로 남았다).
+- 일회성 이전 `dev/migrate_structure_library.py`(dry-run / `--apply`, git mv, 멱등). 이 PC 데이터 클론에서 20개 · 카테고리 4개(Dnable · JUN · MUE · SA) 로컬 커밋 `0a11b35` — **데이터 저장소 푸시 안 함**.
+- 시험 `tests/test_structure_library.py` 51/51 + 기존 전부 통과(mayapy 전용 `test_export_worker` 제외). GUI 실기 확인 대기.
+
+## 2026-11-26
 
 > [!summary] **`A00275_skinTool_V01` v01.49 — Flood : Add Influence 한 조인트를 리스트에서 선택** `#A00275_skinTool_V01`
 - 요청: Weights > Flood 에서 `Add Influence` 로 인플루언스를 붙이면 그 조인트들이 TSL 에서 선택되게.

@@ -147,6 +147,9 @@ try:
 
     # ---- 메인 창에 탭이 있다
     from tools.A00210_FileManager.app.ui.main_window import MainWindow  # noqa: E402
+    from tools.A00210_FileManager.app.core import library_settings as LS  # noqa: E402
+    import tempfile as _tf  # noqa: E402
+    LS.SETTINGS_PATH = os.path.join(_tf.mkdtemp(prefix="a00210_lib_"), "structure_library.json")  # 실제 PC 설정 보호 (v01.60)
     win = MainWindow()
     names = [win.maya_tab.tabs.tabText(i) for i in range(win.maya_tab.tabs.count())]
     check("Maya tab has Reference / Export / File Date", names == ["Reference", "Export", "File Date"], names)

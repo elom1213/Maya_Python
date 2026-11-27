@@ -80,9 +80,12 @@ P.set_active("Back")
 
 from tools.A00210_FileManager.app.ui import main_window as mw   # noqa: E402
 win = mw.MainWindow()
-fields_back = (win.ipf_store_dir.text(), win.ipf_project_root.text(), win.path_structure_tab.ipf_recreate_to.text())
+# v01.60 : Recreate To 는 프로파일이 아니라 PC 단위 설정 - 프로파일 왕복 비교에서 뺀다(시드 값은 slash 인지만 본다).
+check("UI: Recreate To seeded from the active profile, slash", win.path_structure_tab.ipf_recreate_to.text() == "E:/out",
+      win.path_structure_tab.ipf_recreate_to.text())
+fields_back = (win.ipf_store_dir.text(), win.ipf_project_root.text())
 win.on_profile_changed("Fwd")
-fields_fwd = (win.ipf_store_dir.text(), win.ipf_project_root.text(), win.path_structure_tab.ipf_recreate_to.text())
+fields_fwd = (win.ipf_store_dir.text(), win.ipf_project_root.text())
 check("UI: \\ profile and / profile show identical text", fields_back == fields_fwd, (fields_back, fields_fwd))
 check("UI: no backslash in fields", not any("\\" in f for f in fields_back), fields_back)
 win.ipf_project_root.setText("C:\\typed\\path\\")

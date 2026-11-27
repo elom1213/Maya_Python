@@ -516,6 +516,9 @@ try:
     from tools.A00210_FileManager.app.ui import main_window as mw
     from Framework.themes.theme_manager import ThemeManager
     ThemeManager.load_theme_dev(app, "slate_mid")      # launch.py 와 같은 테마 - 높이는 테마 글자 크기로 정해진다
+    from tools.A00210_FileManager.app.core import library_settings as LS
+    import tempfile as _tf
+    LS.SETTINGS_PATH = os.path.join(_tf.mkdtemp(prefix="a00210_lib_"), "structure_library.json")  # 실제 PC 설정 보호 (v01.60)
     win = mw.MainWindow()
     titles = [win.tabs.tabText(i) for i in range(win.tabs.count())]
     check("MainWindow has Sync tab", titles[-1] == "Sync", titles)
